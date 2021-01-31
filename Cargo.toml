@@ -1,0 +1,8 @@
+[package]
+name = "meowality-hls"
+version = "0.1.0"
+authors = ["D Shah <d@ds0.me>"]
+edition = "2018"
+
+[dependencies]
+rustc-hash = "1.1.0"
