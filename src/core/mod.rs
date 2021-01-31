@@ -9,7 +9,7 @@ pub mod object_store;
 pub mod sso_array;
 pub mod tagged_obj;
 
-pub use constant::Constant;
+pub use constant::{BitVector, Constant};
 pub use idstring::{IdStringDb, IdString};
 pub use indexed_set::IndexedSet;
 pub use logging::ToStrWithCtx;
