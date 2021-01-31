@@ -2,6 +2,7 @@
 #![feature(deque_range)]
 #![feature(min_const_generics)]
 
+pub mod ast;
 pub mod core;
 pub mod design;
 
