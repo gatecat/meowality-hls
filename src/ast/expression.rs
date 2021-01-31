@@ -82,7 +82,7 @@ pub struct FuncCall {
 
 pub struct ArrayAccess {
 	pub array: Box<Expression>,
-	pub index: Box<Expression>,
+	pub indices: Vec<Expression>,
 }
 
 pub struct BitSlice {
@@ -103,6 +103,7 @@ pub enum ExpressionType {
 	Null,
 	Literal(BitVector),
 	Variable(IdString),
+	TemplateArg(IdString),
 	List(Vec<Expression>),
 	Op(Operator),
 	Func(FuncCall),
