@@ -1,4 +1,5 @@
-use crate::core::IdString;
+use crate::core::{BitVector, IdString};
+use crate::ast::base::*;
 use crate::ast::{Expression, Statement};
 use rustc_hash::FxHashMap;
 
@@ -28,21 +29,32 @@ pub struct ArrayType {
 }
 
 pub enum DataType {
-	Null,
+	Void,
 	Auto,
+	TemplParam(IdString),
+	ScopedType(Box<DataType>, IdString),
 	Integer(IntegerType),
 	User(UserType),
+	Reference(Box<DataType>),
 	FIFO(FIFOType),
 	Memory(MemoryType),
 	Array(ArrayType),
 }
 
-pub enum TemplateType {
-	Integer(IntegerType),
-	Typename,
+pub enum TemplateArgType {
+	Integer{t: IntegerType, default: Option<BitVector>},
+	Typename{default: Option<DataType>},
 }
 
-pub struct StructureDefinition {
-	pub templ_args: Vec<TemplateType>,
+pub struct TemplateArg {
+	pub name: IdString,
+	pub arg_type: TemplateArgType,
+	pub attrs: AttributeList,
+}
+
+pub struct StructureDef {
+	pub templ_args: Vec<TemplateArg>,
 	pub items: Vec<Statement>,
+	pub attrs: AttributeList,
+	pub src: SrcInfo,
 }

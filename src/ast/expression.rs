@@ -1,3 +1,4 @@
+use crate::ast::base::*;
 use crate::core::IdString;
 use crate::core::BitVector;
 
@@ -103,6 +104,7 @@ pub enum ExpressionType {
 	Null,
 	Literal(BitVector),
 	Variable(IdString),
+	ScopedVariable(Box<Expression>, IdString),
 	TemplateArg(IdString),
 	List(Vec<Expression>),
 	Op(Operator),
@@ -114,4 +116,6 @@ pub enum ExpressionType {
 
 pub struct Expression {
 	pub ty: ExpressionType,
+	pub attrs: AttributeList,
+	pub src: SrcInfo,
 }
