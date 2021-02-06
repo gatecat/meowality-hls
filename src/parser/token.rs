@@ -3,7 +3,7 @@ use crate::core::constids;
 use std::fmt;
 
 // A list of 'symbol' tokens in descending length order
-const SYMBOLS : &[&'static str] = &[
+pub const SYMBOLS : &[&'static str] = &[
 	">>=",
 	"<<=",
 	"++",
@@ -50,7 +50,7 @@ const SYMBOLS : &[&'static str] = &[
 ];
 
 // A list of IdStrings that are _always_ parsed as keywords and not identifiers
-const KEYWORDS : &[IdString] = &[
+pub const KEYWORDS : &[IdString] = &[
 	constids::void,
 	constids::int,
 	constids::r#char,

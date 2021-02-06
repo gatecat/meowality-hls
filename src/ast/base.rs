@@ -2,8 +2,8 @@ use crate::core::IdString;
 use crate::ast::Expression;
 
 pub struct LineCol {
-	pub line: usize,
-	pub col: usize,
+	pub line: u32,
+	pub col: u32,
 }
 
 pub struct SrcInfo {
