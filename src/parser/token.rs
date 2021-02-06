@@ -1,4 +1,4 @@
-use crate::core::{Constant, IdString};
+use crate::core::{BitVector, IdString};
 use crate::core::constids;
 use std::fmt;
 
@@ -82,7 +82,9 @@ pub enum Token {
 	Symbol(&'static str),
 	Keyword(IdString),
 	Ident(IdString),
-	Literal(Constant),
+	IntLiteral(BitVector),
+	StrLiteral(String),
+	ChrLiteral(String)
 }
 
 impl fmt::Debug for Token {
@@ -92,7 +94,9 @@ impl fmt::Debug for Token {
 			Symbol(s) => write!(f, "token '{}'", s),
 			Keyword(k) => write!(f, "keyword '{}'", k),
 			Ident(i) => write!(f, "identifier '{}'", i),
-			Literal(l) => write!(f, "literal '{:?}'", l),
+			IntLiteral(l) => write!(f, "literal {:?}", l),
+			StrLiteral(l) => write!(f, "literal \"{}\"", l),
+			ChrLiteral(l) => write!(f, "literal \'{}\'", l),
 		}
 	}
 }

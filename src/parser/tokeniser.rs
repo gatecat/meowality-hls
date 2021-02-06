@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use crate::parser::token::*;
 use crate::ast::LineCol;
-use crate::core::{Constant, BitVector, IdString, IdStringDb};
+use crate::core::{BitVector, IdString, IdStringDb, State};
 
 // Fast matching of ASCII characters
 pub struct CharPool {
@@ -164,6 +164,38 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 		}
 		Ok(())
 	}
+	pub fn parse_number(&self) -> Result<BitVector, TokeniserError> {
+		if self.buf.len() >= 2 && self.buf.starts_with('0') {
+			// based string, arbitrary precision
+			// NB unlike C cursedness, we use 0o and not 0 as a prefix for octal
+			let base_ch = self.buf.chars().nth(1).unwrap();
+			let base_l2 = match base_ch {
+				'x' => Ok(4),
+				'b' => Ok(1),
+				'o' => Ok(3),
+				x => Err(self.err(format!("invalid base '{}', use 0o as a prefix for octal literals", x)))
+			}?;
+			let base = 1<<base_l2;
+			let mut bv = BitVector::new((self.buf.len() - 2) * base_l2);
+			for i in 0..(self.buf.len() - 2) {
+				let ch_idx = (self.buf.len() - 1) - i;
+				// This looks bad but we know there is no UTF-8 at this point
+				let ch = &self.buf[ch_idx..ch_idx+1];
+				// Is there a better way to do this???
+				let ch_value = u8::from_str_radix(ch, 1<<base).or(Err(self.err(format!("unexpected char '{}' in base-{} literal", ch, base))))?;
+				for j in 0..base_l2 {
+					if ((ch_value >> j) & 0x1) == 0x1 {
+						bv.set(i * base_l2 + j, State::S1);
+					}
+				}
+			}
+			Ok(bv)
+		} else {
+			// decimal string
+			let parsed = self.buf.parse::<u64>().or(Err(self.err(format!("failed to parse integer literal '{}'", &self.buf))))?;
+			Ok(BitVector::from_u64(parsed, 64))
+		}
+	}
 	pub fn token(&mut self, ids: &mut IdStringDb) -> Result<Token, TokeniserError> {
 		self.skip_whitespace();
 		let ch0 = self.peek().ok_or(self.err(format!("end of file")))?;
@@ -175,7 +207,7 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 					return Ok(Token::Symbol(s));
 				}
 			}
-			return Err(self.err(format!("unexpected symbol {}", ch0)))
+			return Err(self.err(format!("unexpected symbol {}", ch0)));
 		} else if ch0.is_ascii_digit() {
 			// parse as numeric literal
 			self.buf.clear();
@@ -191,11 +223,15 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 					break;
 				}
 			}
-			// TODO: actual parsing
+			return Ok(Token::IntLiteral(self.parse_number()?));
 		} else if ch0 == '\"' {
 			// parse as string literal
+			self.get_string('\"')?;
+			return Ok(Token::StrLiteral(self.buf.clone()));
 		} else if ch0 == '\'' {
 			// parse as char (or multi-char) literal
+			self.get_string('\'')?;
+			return Ok(Token::StrLiteral(self.buf.clone()));
 		} else {
 			// parse as identifier
 			self.buf.clear();
@@ -215,6 +251,5 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 				return Ok(Token::Ident(id));
 			}
 		}
-		Err(self.err(format!("unexpected token starting with {}", ch0)))
 	}
 }
