@@ -1,11 +1,13 @@
 use crate::core::IdString;
 use crate::ast::Expression;
 
+#[derive(Eq, PartialEq, Debug)]
 pub struct LineCol {
 	pub line: u32,
 	pub col: u32,
 }
 
+#[derive(Eq, PartialEq, Debug)]
 pub struct SrcInfo {
 	pub file: IdString,
 	pub start: LineCol,

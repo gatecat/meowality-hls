@@ -51,6 +51,7 @@ pub struct Tokeniser<Iter: Iterator<Item=char>> {
 	buf: String,
 }
 
+#[derive(Eq, PartialEq, Debug)]
 pub struct TokeniserError {
 	pub file: IdString,
 	pub lc: LineCol,
@@ -182,7 +183,7 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 				// This looks bad but we know there is no UTF-8 at this point
 				let ch = &self.buf[ch_idx..ch_idx+1];
 				// Is there a better way to do this???
-				let ch_value = u8::from_str_radix(ch, 1<<base).or(Err(self.err(format!("unexpected char '{}' in base-{} literal", ch, base))))?;
+				let ch_value = u8::from_str_radix(ch, base).or(Err(self.err(format!("unexpected char '{}' in base-{} literal", ch, base))))?;
 				for j in 0..base_l2 {
 					if ((ch_value >> j) & 0x1) == 0x1 {
 						bv.set(i * base_l2 + j, State::S1);
@@ -204,6 +205,9 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 			self.update_lookahead(self.max_symbol_len);
 			for s in SYMBOLS {
 				if s.chars().enumerate().all(|(i, c)| *self.lookahead.get(i).unwrap() == c) {
+					for _ in 0..s.len() {
+						self.get();
+					}
 					return Ok(Token::Symbol(s));
 				}
 			}
@@ -251,5 +255,62 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 				return Ok(Token::Ident(id));
 			}
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use Token::*;
+	use crate::core::constids;
+	#[test]
+	fn symbols() {
+		let mut ids = IdStringDb::new();
+		constids::do_ids_init(&mut ids);
+		let mut tok = Tokeniser::new(ids.id("<test>"), "{(++-/=<<=  )	}".chars());
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("{")));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("(")));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("++")));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("-")));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("/=")));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("<<=")));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol(")")));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("}")));
+		assert!(tok.token(&mut ids).is_err());
+	}
+	#[test]
+	fn int_literals() {
+		let mut ids = IdStringDb::new();
+		constids::do_ids_init(&mut ids);
+		let mut tok = Tokeniser::new(ids.id("<test>"), "
+			1234
+			0x1234
+			0x100_200'300
+			0o1234
+			0b101010
+			01234
+			0b1234
+		".chars());
+		assert_eq!(tok.token(&mut ids), Ok(IntLiteral(BitVector::from_u64(1234, 64))));
+		assert_eq!(tok.token(&mut ids), Ok(IntLiteral(BitVector::from_u64(0x1234, 16))));
+		assert_eq!(tok.token(&mut ids), Ok(IntLiteral(BitVector::from_u64(0x100200300, 36))));
+		assert_eq!(tok.token(&mut ids), Ok(IntLiteral(BitVector::from_u64(0o1234, 12))));
+		assert_eq!(tok.token(&mut ids), Ok(IntLiteral(BitVector::from_u64(0b101010, 6))));
+		assert!(tok.token(&mut ids).is_err());
+		assert!(tok.token(&mut ids).is_err());
+		assert!(tok.token(&mut ids).is_err());
+	}
+	#[test]
+	fn keywords() {
+		let mut ids = IdStringDb::new();
+		constids::do_ids_init(&mut ids);
+		let mut tok = Tokeniser::new(ids.id("<test>"), "if{continue break struct}".chars());
+		assert_eq!(tok.token(&mut ids), Ok(Keyword(constids::r#if)));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("{")));
+		assert_eq!(tok.token(&mut ids), Ok(Keyword(constids::r#continue)));
+		assert_eq!(tok.token(&mut ids), Ok(Keyword(constids::r#break)));
+		assert_eq!(tok.token(&mut ids), Ok(Keyword(constids::r#struct)));
+		assert_eq!(tok.token(&mut ids), Ok(Symbol("}")));
+		assert!(tok.token(&mut ids).is_err());
 	}
 }

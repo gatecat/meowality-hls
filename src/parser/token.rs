@@ -78,6 +78,7 @@ pub const KEYWORDS : &[IdString] = &[
 	constids::block,
 ];
 
+#[derive(Eq, PartialEq, Clone)]
 pub enum Token {
 	Symbol(&'static str),
 	Keyword(IdString),
