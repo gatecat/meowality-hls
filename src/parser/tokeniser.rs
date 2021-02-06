@@ -3,6 +3,41 @@ use crate::parser::token::*;
 use crate::ast::LineCol;
 use crate::core::{Constant, BitVector, IdString, IdStringDb};
 
+// Fast matching of ASCII characters
+pub struct CharPool {
+	chars: u128,
+}
+
+impl CharPool {
+	pub fn from_iter<Iter: Iterator<Item=char>>(mut iter: Iter)  -> CharPool {
+		let mut p = CharPool {
+			chars: 0,
+		};
+		let mut buf : [u8; 1] = [0];
+		loop {
+			match iter.next() {
+				Some(c) => {
+					c.encode_utf8(&mut buf);
+					assert!(buf[0] < 128);
+					p.chars |= 1 << (buf[0] as u128);
+				}
+				None => break
+			}
+		}
+		return p;
+	}
+	pub fn is_match(&self, ch: char) -> bool {
+		if ch.len_utf8() > 1 {
+			return false;
+		}
+		let mut buf : [u8; 1] = [0];
+		ch.encode_utf8(&mut buf);
+		if buf[0] >= 128 {
+			return false;
+		}
+		return ((self.chars >> buf[0]) & 0x1) == 0x1;
+	}
+}
 
 pub struct Tokeniser<Iter: Iterator<Item=char>> {
 	iter: Iter,
@@ -12,6 +47,7 @@ pub struct Tokeniser<Iter: Iterator<Item=char>> {
 	colno: u32,
 	// some internal helper structures
 	max_symbol_len: usize,
+	first_symbol_chars: CharPool,
 	buf: String,
 }
 
@@ -30,6 +66,7 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 			lineno: 1,
 			colno: 1,
 			max_symbol_len: SYMBOLS.iter().map(|x| x.len()).max().unwrap_or(0),
+			first_symbol_chars: CharPool::from_iter(SYMBOLS.iter().map(|x| x.chars().nth(0).unwrap())),
 			buf: String::new(),
 		};
 		state.update_lookahead(1);
@@ -84,8 +121,8 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 			msg: s,
 		}
 	}
-	pub fn is_symbol_start(ch: char) -> bool {
-		SYMBOLS.iter().any(|x| x.chars().nth(0).unwrap() == ch)
+	pub fn is_symbol_start(&self, ch: char) -> bool {
+		self.first_symbol_chars.is_match(ch)
 	}
 	pub fn get_string(&mut self, str_type: char) -> Result<(), TokeniserError> {
 		let mut escaped = false;
@@ -127,10 +164,10 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 		}
 		Ok(())
 	}
-	pub fn token(&mut self) -> Result<Token, TokeniserError> {
+	pub fn token(&mut self, ids: &mut IdStringDb) -> Result<Token, TokeniserError> {
 		self.skip_whitespace();
 		let ch0 = self.peek().ok_or(self.err(format!("end of file")))?;
-		if Self::is_symbol_start(ch0) {
+		if self.is_symbol_start(ch0) {
 			// parse as symbol token
 			self.update_lookahead(self.max_symbol_len);
 			for s in SYMBOLS {
@@ -161,6 +198,22 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 			// parse as char (or multi-char) literal
 		} else {
 			// parse as identifier
+			self.buf.clear();
+			while !self.eof() {
+				let ch = self.peek().unwrap();
+				if !ch.is_whitespace() && !self.is_symbol_start(ch) {
+					self.buf.push(ch);
+					self.get();
+				} else {
+					break;
+				}
+			}
+			let id = ids.id(&self.buf);
+			if KEYWORDS.iter().any(|kw| *kw == id) {
+				return Ok(Token::Keyword(id));
+			} else {
+				return Ok(Token::Ident(id));
+			}
 		}
 		Err(self.err(format!("unexpected token starting with {}", ch0)))
 	}
