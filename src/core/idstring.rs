@@ -58,7 +58,7 @@ impl IdStringDb {
 }
 
 
-macro_rules! constids {
+#[macro_export] macro_rules! constids {
 	($($id:ident),*,) => {
 		#[repr(u32)]
 		#[allow(non_camel_case_types)]
@@ -66,7 +66,7 @@ macro_rules! constids {
 			ID_NONE = 0,
 			$($id),*
 		}
-		$(pub const $id : crate::core::IdString = crate::core::idstring::IdString { index: ConstIdIdx::$id as u32 };)*
+		$(#[allow(non_upper_case_globals)] pub const $id : crate::core::IdString = crate::core::idstring::IdString { index: ConstIdIdx::$id as u32 };)*
 		pub fn do_ids_init(db: &mut crate::core::IdStringDb) {
 			$(db.init_add(stringify!($id), ConstIdIdx::$id as u32));*
 		}

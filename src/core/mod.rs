@@ -1,4 +1,5 @@
 pub mod constant;
+pub mod constids;
 pub mod frozen_map;
 pub mod idstring;
 pub mod indexed_set;
