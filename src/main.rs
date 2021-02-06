@@ -5,6 +5,7 @@
 pub mod ast;
 pub mod core;
 pub mod design;
+pub mod parser;
 
 fn main() {
     println!("Hello, world!");
