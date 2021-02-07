@@ -67,13 +67,13 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			self.toks.pop_front().ok_or(self.err(format!("unexpected end of file")))
 		}
 	}
+	// In ambiguous mode, we don't really eat the tokens but just pretend to; as we might need to backtrack
 	pub fn enter_ambig(&mut self) {
-		// In ambiguous mode, we don't really eat the tokens but just pretend to; as we might need to backtrack
 		self.ptr = 0;
 		self.ambig_mode = true;
 	}
+	// Ambiguous mode ended successfully, found an unambiguous match, now commit by actually eating the tokens
 	pub fn ambig_success(&mut self, ids: &mut IdStringDb) -> Result<(), ParserError> {
-		// Ambiguous mode ended successfully, found an unambiguous match, now commit by actually eating the tokens
 		for _ in 0..self.ptr {
 			self.toks.pop_front();
 		}
@@ -82,11 +82,86 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		self.update_lookahead(ids, 1)?;
 		Ok(())
 	}
+	// Ambiguous mode hasn't resolved (yet), backtrack so we can try parsing differently
 	pub fn ambig_failure(&mut self, ids: &mut IdStringDb) -> Result<(), ParserError> {
-		// Ambiguous mode hasn't resolved (yet), backtrack so we can try parsing differently
 		self.ptr = 0;
 		self.ambig_mode = false;
 		self.update_lookahead(ids, 1)?;
 		Ok(())
+	}
+	// Check if a symbol is the next token
+	pub fn check_sym(&self, sym: &'static str) -> bool {
+		match self.peek() {
+			Some((Symbol(s), _)) => (*s == sym),
+			_ => false,
+		}
+	}
+	// Check if a symbol is the next token; and consume it if it is
+	pub fn consume_sym(&mut self, ids: &mut IdStringDb, sym: &'static str) -> Result<bool, ParserError> {
+		if self.check_sym(sym) {
+			self.get(ids)?;
+			Ok(true)
+		} else {
+			Ok(false)
+		}
+	}
+	// Check if a keyword is the next token; and consume it if it is
+	pub fn consume_kw(&mut self, ids: &mut IdStringDb, kw: IdString) -> Result<bool, ParserError> {
+		match self.peek() {
+			Some((Keyword(x), _)) | Some((Ident(x), _)) => {
+				if *x == kw {
+					self.get(ids)?; // consume
+					Ok(true)
+				} else {
+					Ok(false)
+				}
+			}
+			_ => Ok(false)
+		}
+	}
+	// Check if an identifier is the next token; and consume it if it is
+	pub fn consume_ident(&mut self, ids: &mut IdStringDb) -> Result<Option<IdString>, ParserError> {
+		match self.peek() {
+			Some((Ident(x), _)) => { let x = *x; self.get(ids)?; Ok(Some(x)) },
+			_ => Ok(None)
+		}
+	}
+	// Check if an literal is the next token; and consume it if it is
+	pub fn consume_literal(&mut self, ids: &mut IdStringDb) -> Result<Option<Token>, ParserError> {
+		let next = self.peek();
+		match next {
+			Some((IntLiteral(_), _)) | Some((ChrLiteral(_), _)) | Some((StrLiteral(_), _)) 
+				=> { let next = next.unwrap().0.clone(); self.get(ids)?; Ok(Some(next)) },
+			_ => Ok(None)
+		}
+	}
+	// Expect a symbol as the next token
+	pub fn expect_sym(&mut self, ids: &mut IdStringDb, sym: &'static str) -> Result<(), ParserError>  {
+		if !self.consume_sym(ids, sym)? {
+			Err(self.err(format!("expected '{}', got {:?}", sym, self.peek())))
+		} else {
+			Ok(())
+		}
+	}
+	// Expect a keyword as the next token
+	pub fn expect_kw(&mut self, ids: &mut IdStringDb, kw: IdString) -> Result<(), ParserError>  {
+		if !self.consume_kw(ids, kw)? {
+			Err(self.err(format!("expected '{}', got {:?}", kw, self.peek())))
+		} else {
+			Ok(())
+		}
+	}
+	// Expect an identifier as the next token
+	pub fn expect_ident(&mut self, ids: &mut IdStringDb) -> Result<IdString, ParserError>  {
+		match self.consume_ident(ids)? {
+			Some(x) => Ok(x),
+			_ => Err(self.err(format!("expected identifier, got {:?}", self.peek())))
+		}
+	}
+	pub fn expect_literal(&mut self, ids: &mut IdStringDb) -> Result<Token, ParserError>  {
+		match self.consume_literal(ids)? {
+			Some(x) => Ok(x),
+			_ => Err(self.err(format!("expected literal, got {:?}", self.peek())))
+		}
 	}
 }
