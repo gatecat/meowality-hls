@@ -28,7 +28,7 @@ pub struct ArrayType {
 	pub dims: Vec<Expression>,
 }
 
-pub enum DataType {
+pub enum DataTypes {
 	Void,
 	Auto,
 	TemplParam(IdString),
@@ -39,6 +39,12 @@ pub enum DataType {
 	FIFO(FIFOType),
 	Memory(MemoryType),
 	Array(ArrayType),
+}
+
+pub struct DataType {
+	pub typ: DataTypes,
+	pub is_static: bool,
+	pub is_const: bool,
 }
 
 pub enum TemplateArgType {
@@ -53,6 +59,7 @@ pub struct TemplateArg {
 }
 
 pub struct StructureDef {
+	pub name: IdString,
 	pub templ_args: Vec<TemplateArg>,
 	pub items: Vec<Statement>,
 	pub attrs: AttributeList,
