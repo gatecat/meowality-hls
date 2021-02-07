@@ -57,9 +57,16 @@ impl IdStringDb {
 	}
 }
 
+pub fn strip_raw_prefix<'a>(s: &'a str) -> &'a str {
+	if s.starts_with("r#") {
+		&s[2..]
+	} else {
+		s
+	}
+}
 
 #[macro_export] macro_rules! constids {
-	($($id:ident),*,) => {
+	($($id:tt),*,) => {
 		#[repr(u32)]
 		#[allow(non_camel_case_types)]
 		enum ConstIdIdx {
@@ -68,7 +75,7 @@ impl IdStringDb {
 		}
 		$(#[allow(non_upper_case_globals)] pub const $id : crate::core::IdString = crate::core::idstring::IdString { index: ConstIdIdx::$id as u32 };)*
 		pub fn do_ids_init(db: &mut crate::core::IdStringDb) {
-			$(db.init_add(stringify!($id), ConstIdIdx::$id as u32));*
+			$(db.init_add(crate::core::idstring::strip_raw_prefix(stringify!($id)), ConstIdIdx::$id as u32));*
 		}
 	};
 }
