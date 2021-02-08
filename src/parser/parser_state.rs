@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
 
 use crate::ast::LineCol;
-use crate::core::{BitVector, IdString, IdStringDb};
+use crate::core::{IdString, IdStringDb};
 use crate::parser::{Token, Tokeniser, TokeniserError};
 use Token::*;
 
-struct Parser<Iter: Iterator<Item=char>>  {
+struct ParserState<Iter: Iterator<Item=char>>  {
 	tokeniser: Tokeniser<Iter>,
 	toks: VecDeque<(Token, LineCol)>,
 	ptr: usize,
@@ -29,9 +29,9 @@ impl ParserError {
 	}
 }
 
-impl <Iter: Iterator<Item=char>> Parser<Iter> {
-	pub fn new(tok: Tokeniser<Iter>, ids: &mut IdStringDb) -> Result<Parser<Iter>, ParserError> {
-		let mut p = Parser {
+impl <Iter: Iterator<Item=char>> ParserState<Iter> {
+	pub fn new(tok: Tokeniser<Iter>, ids: &mut IdStringDb) -> Result<ParserState<Iter>, ParserError> {
+		let mut p = ParserState {
 			tokeniser: tok,
 			toks: VecDeque::new(),
 			ptr: 0,
@@ -138,7 +138,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 	// Expect a symbol as the next token
 	pub fn expect_sym(&mut self, ids: &mut IdStringDb, sym: &'static str) -> Result<(), ParserError>  {
 		if !self.consume_sym(ids, sym)? {
-			Err(self.err(format!("expected '{}', got {:?}", sym, self.peek())))
+			Err(self.err(format!("expected '{}', got {:?}", sym, self.peek().unwrap().0)))
 		} else {
 			Ok(())
 		}
@@ -146,7 +146,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 	// Expect a keyword as the next token
 	pub fn expect_kw(&mut self, ids: &mut IdStringDb, kw: IdString) -> Result<(), ParserError>  {
 		if !self.consume_kw(ids, kw)? {
-			Err(self.err(format!("expected '{}', got {:?}", kw, self.peek())))
+			Err(self.err(format!("expected '{}', got {:?}", kw, self.peek().unwrap().0)))
 		} else {
 			Ok(())
 		}
@@ -155,13 +155,62 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 	pub fn expect_ident(&mut self, ids: &mut IdStringDb) -> Result<IdString, ParserError>  {
 		match self.consume_ident(ids)? {
 			Some(x) => Ok(x),
-			_ => Err(self.err(format!("expected identifier, got {:?}", self.peek())))
+			_ => Err(self.err(format!("expected identifier, got {:?}", self.peek().unwrap().0)))
 		}
 	}
 	pub fn expect_literal(&mut self, ids: &mut IdStringDb) -> Result<Token, ParserError>  {
 		match self.consume_literal(ids)? {
 			Some(x) => Ok(x),
-			_ => Err(self.err(format!("expected literal, got {:?}", self.peek())))
+			_ => Err(self.err(format!("expected literal, got {:?}", self.peek().unwrap().0)))
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::core::constids;
+	#[test]
+	fn symbols() -> Result<(), ParserError> {
+		let mut ids = IdStringDb::new();
+		constids::do_ids_init(&mut ids);
+		let tok = Tokeniser::new(ids.id("<test>"), "{++!=".chars());
+		let mut ps = ParserState::new(tok, &mut ids)?;
+		assert_eq!(ps.consume_sym(&mut ids, "++")?, false);
+		assert_eq!(ps.consume_sym(&mut ids, "{")?, true);
+		assert_eq!(ps.expect_sym(&mut ids, "++"), Ok(()));
+		assert_eq!(ps.expect_sym(&mut ids, "--").unwrap_err().msg, "expected '--', got token '!='");
+		Ok(())
+	}
+	#[test]
+	fn ident_keyword() -> Result<(), ParserError> {
+		let mut ids = IdStringDb::new();
+		constids::do_ids_init(&mut ids);
+		let tok = Tokeniser::new(ids.id("<test>"), "struct foo{".chars());
+		let mut ps = ParserState::new(tok, &mut ids)?;
+		assert_eq!(ps.consume_kw(&mut ids, constids::r#if)?, false);
+		assert_eq!(ps.consume_kw(&mut ids, constids::r#struct)?, true);
+		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("foo")));
+		assert_eq!(ps.expect_ident(&mut ids).unwrap_err().msg, "expected identifier, got token '{'");
+		Ok(())
+	}
+	#[test]
+	fn ambig_mode() -> Result<(), ParserError> {
+		let mut ids = IdStringDb::new();
+		constids::do_ids_init(&mut ids);
+		let tok = Tokeniser::new(ids.id("<test>"), "{ mytype::foo bar".chars());
+		let mut ps = ParserState::new(tok, &mut ids)?;
+		assert_eq!(ps.consume_sym(&mut ids, "{")?, true);
+		ps.enter_ambig();
+		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("mytype")));
+		assert_eq!(ps.consume_sym(&mut ids, "::")?, true);
+		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("foo")));
+		ps.ambig_failure(&mut ids)?;
+		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("mytype")));
+		assert_eq!(ps.consume_sym(&mut ids, "::")?, true);
+		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("foo")));
+		ps.ambig_success(&mut ids)?;
+		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("bar")));
+		Ok(())
 	}
 }

@@ -1,4 +1,4 @@
-pub mod parser;
+pub mod parser_state;
 pub mod token;
 pub mod tokeniser;
 
