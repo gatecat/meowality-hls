@@ -5,8 +5,9 @@ pub mod scope;
 pub mod statement;
 pub mod namespace;
 
-pub use base::LineCol;
+pub use base::{LineCol, SrcInfo, AttributeList};
 pub use datatype::{DataType, TemplateArg, TemplateArgType, StructureDef};
-pub use expression::Expression;
+pub use expression::{ExprType, Expression};
 pub use statement::{Statement, Module, Function};
-pub use scope::Scope;
+pub use namespace::Namespace;
+pub use scope::{IdentifierType, Scope};

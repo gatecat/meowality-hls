@@ -100,7 +100,7 @@ pub enum BuiltinType {
 	Delay,
 }
 
-pub enum ExpressionType {
+pub enum ExprType {
 	Null,
 	Literal(BitVector),
 	Variable(IdString),
@@ -115,7 +115,17 @@ pub enum ExpressionType {
 }
 
 pub struct Expression {
-	pub ty: ExpressionType,
+	pub ty: ExprType,
 	pub attrs: AttributeList,
 	pub src: SrcInfo,
+}
+
+impl Expression {
+	pub fn new(ty: ExprType, attrs: AttributeList, src: SrcInfo) -> Expression {
+		Expression {
+			ty: ty,
+			attrs: attrs,
+			src: src,
+		}
+	}
 }

@@ -9,6 +9,7 @@ pub struct IdString { pub index: u32 }
 // Our fast indexed string pool
 
 impl IdString {
+	pub const NONE : IdString = IdString { index: 0};
 	pub fn val(&self) -> u32 {
 		return self.index;
 	}

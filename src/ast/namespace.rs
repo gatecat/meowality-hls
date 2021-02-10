@@ -14,6 +14,17 @@ pub struct Namespace {
 	pub src: SrcInfo,
 }
 
+impl Namespace {
+	pub fn new(name: Option<IdString>, attrs: AttributeList, src: SrcInfo) -> Namespace {
+		Namespace {
+			name: name,
+			content: Vec::new(),
+			attrs: attrs,
+			src: src,
+		}
+	}
+}
+
 impl Scope for Namespace {
 	fn is_type(&self, ident: IdString) -> bool {
 		self.content.iter().any(|c| match c { NamespaceItem::Stmt(s) => s.leaf_is_type(ident), _ => false })

@@ -5,7 +5,7 @@ use crate::core::{IdString, IdStringDb};
 use crate::parser::{Token, Tokeniser, TokeniserError};
 use Token::*;
 
-struct ParserState<Iter: Iterator<Item=char>>  {
+pub struct ParserState<Iter: Iterator<Item=char>>  {
 	tokeniser: Tokeniser<Iter>,
 	toks: VecDeque<(Token, LineCol)>,
 	ptr: usize,

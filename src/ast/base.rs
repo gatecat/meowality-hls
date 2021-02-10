@@ -11,7 +11,15 @@ pub struct LineCol {
 pub struct SrcInfo {
 	pub file: IdString,
 	pub start: LineCol,
-	pub end: LineCol,
+}
+
+impl SrcInfo {
+	pub fn default() -> SrcInfo {
+		SrcInfo {
+			file: IdString::NONE,
+			start: LineCol { line: 0, col: 0},
+		}
+	}
 }
 
 pub struct Attribute {
@@ -20,3 +28,9 @@ pub struct Attribute {
 }
 
 pub struct AttributeList(Vec<Attribute>);
+
+impl AttributeList {
+	pub fn new() -> AttributeList {
+		AttributeList(Vec::new())
+	}
+}
