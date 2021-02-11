@@ -24,10 +24,10 @@ impl SrcInfo {
 
 pub struct Attribute {
 	pub name: IdString,
-	pub value: Option<Expression>,
+	pub value: Expression,
 }
 
-pub struct AttributeList(Vec<Attribute>);
+pub struct AttributeList(pub Vec<Attribute>);
 
 impl AttributeList {
 	pub fn new() -> AttributeList {

@@ -26,6 +26,8 @@ pub const SYMBOLS : &[&'static str] = &[
 	">>",
 	"<<",
 	"::",
+	"[[",
+	"]]",
 	"{",
 	"}",
 	"[",
@@ -79,6 +81,7 @@ pub const KEYWORDS : &[IdString] = &[
 	constids::r#return,
 	constids::r#sizeof,
 	constids::block,
+	constids::static_cast,
 ];
 
 #[derive(Eq, PartialEq, Clone)]

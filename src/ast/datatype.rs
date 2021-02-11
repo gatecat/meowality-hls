@@ -48,7 +48,7 @@ pub struct DataType {
 }
 
 pub enum TemplateArgType {
-	Integer{t: IntegerType, default: Option<BitVector>},
+	Value{t: DataType, default: Option<Expression>},
 	Typename{default: Option<DataType>},
 }
 
@@ -56,6 +56,23 @@ pub struct TemplateArg {
 	pub name: IdString,
 	pub arg_type: TemplateArgType,
 	pub attrs: AttributeList,
+}
+
+impl TemplateArg {
+	pub fn value(name: IdString, t: DataType, default: Option<Expression>, attrs: AttributeList) -> TemplateArg {
+		TemplateArg {
+			name: name,
+			arg_type: TemplateArgType::Value {t: t, default: default},
+			attrs: attrs,
+		}
+	}
+	pub fn typename(name: IdString, default: Option<DataType>, attrs: AttributeList) -> TemplateArg {
+		TemplateArg {
+			name: name,
+			arg_type: TemplateArgType::Typename {default: default},
+			attrs: attrs,
+		}
+	}
 }
 
 pub struct StructureDef {

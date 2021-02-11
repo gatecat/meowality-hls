@@ -121,7 +121,14 @@ pub struct Expression {
 }
 
 impl Expression {
-	pub fn new(ty: ExprType, attrs: AttributeList, src: SrcInfo) -> Expression {
+	pub fn new(ty: ExprType)  -> Expression {
+		Expression {
+			ty: ty,
+			attrs: AttributeList::new(),
+			src: SrcInfo::default(),
+		}
+	}
+	pub fn new_full(ty: ExprType, attrs: AttributeList, src: SrcInfo) -> Expression {
 		Expression {
 			ty: ty,
 			attrs: attrs,

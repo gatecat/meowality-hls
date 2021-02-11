@@ -224,7 +224,7 @@ impl Scope for Statement {
 		for targ in self.templ_args() {
 			if targ.name == ident {
 				match targ.arg_type {
-					TemplateArgType::Integer{t: _, default: _} => { return true },
+					TemplateArgType::Value{t: _, default: _} => { return true },
 					_ => {}
 				}
 			}

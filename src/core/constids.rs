@@ -42,4 +42,5 @@ constids! {
 	enable,
 	input,
 	output,
+	static_cast,
 }
