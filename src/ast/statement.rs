@@ -3,22 +3,26 @@ use crate::ast::base::*;
 use crate::ast::{DataType, Expression, StructureDef, TemplateArg, TemplateArgType};
 use crate::ast::Scope;
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct VariableDecl {
 	pub name: IdString,
 	pub ty: DataType,
 	pub init: Option<Expression>,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct TypedefDecl {
 	pub name: IdString,
 	pub ty: DataType,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct UsingDecl {
 	pub name: IdString,
 	pub ty: DataType,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct IfStatement {
 	pub cond: Expression,
 	pub if_true: Box<Statement>,
@@ -26,6 +30,7 @@ pub struct IfStatement {
 	pub is_meta: bool,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct ForLoop {
 	pub init: Box<Statement>,
 	pub cond: Expression,
@@ -34,10 +39,12 @@ pub struct ForLoop {
 	pub is_meta: bool,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct MulticycleBlock {
 	pub content: Box<Statement>,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct FunctionArg {
 	pub name: IdString,
 	pub data_type: DataType,
@@ -45,6 +52,7 @@ pub struct FunctionArg {
 	pub attrs: AttributeList,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Function {
 	pub name: IdString,
 	pub templ_args: Vec<TemplateArg>,
@@ -55,30 +63,36 @@ pub struct Function {
 	pub content: Box<Statement>,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum IODir {
 	Input,
 	Output,
 	Interface,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct ModuleIO {
 	pub arg_type: DataType,
 	pub name: IdString,
 	pub dir: IODir,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct ClockInfo {
-	pub freq: f64,
+	pub freq: u64,
 	pub is_falling_edge: bool,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct EnableInfo {}
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct ResetInfo {
 	pub is_sync: bool,
 	pub is_active_low: bool,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Module {
 	pub name: IdString,
 	pub templ_args: Vec<TemplateArg>,
@@ -91,6 +105,7 @@ pub struct Module {
 	pub content: Box<Statement>,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum StatementType {
 	Null,
 	Typedef(TypedefDecl),
@@ -108,6 +123,7 @@ pub enum StatementType {
 	Struct(StructureDef),
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Statement {
 	pub ty: StatementType,
 	pub attrs: AttributeList,

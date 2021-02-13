@@ -22,11 +22,13 @@ impl SrcInfo {
 	}
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Attribute {
 	pub name: IdString,
 	pub value: Expression,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct AttributeList(pub Vec<Attribute>);
 
 impl AttributeList {

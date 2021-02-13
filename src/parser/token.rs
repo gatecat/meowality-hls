@@ -56,6 +56,7 @@ pub const SYMBOLS : &[&'static str] = &[
 pub const KEYWORDS : &[IdString] = &[
 	constids::void,
 	constids::int,
+	constids::long,
 	constids::short,
 	constids::r#char,
 	constids::r#string,

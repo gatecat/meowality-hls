@@ -4,6 +4,7 @@ use crate::core::BitVector;
 
 macro_rules! operators {
 	($(($tok:literal, $name:ident, $args:literal, $prec:literal, $postfix:literal)),*,) => {
+		#[derive(Eq, PartialEq, Debug, Clone)]
 		pub enum Operator {
 			$($name),*
 		}
@@ -75,23 +76,27 @@ operators! {
 	("^=",  AsXor,     2,  2, false),
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct FuncCall {
 	pub func_name: IdString,
 	pub func_dest: Option<Box<Expression>>, // if a member function; this is what it is being called on
 	pub func_args: Vec<Expression>,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct ArrayAccess {
 	pub array: Box<Expression>,
 	pub indices: Vec<Expression>,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct BitSlice {
 	pub array: Box<Expression>,
 	pub start: Box<Expression>,
 	pub end: Box<Expression>,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum BuiltinType {
 	SizeOf,
 	WidthOf,
@@ -100,6 +105,7 @@ pub enum BuiltinType {
 	Delay,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum ExprType {
 	Null,
 	Literal(BitVector),
@@ -114,6 +120,7 @@ pub enum ExprType {
 	Builtin(BuiltinType),
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Expression {
 	pub ty: ExprType,
 	pub attrs: AttributeList,
@@ -134,5 +141,8 @@ impl Expression {
 			attrs: attrs,
 			src: src,
 		}
+	}
+	pub fn integer(i: u64, len: usize) -> Expression {
+		Expression::new(ExprType::Literal(BitVector::from_u64(i, len)))
 	}
 }

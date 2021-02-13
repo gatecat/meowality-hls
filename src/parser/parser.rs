@@ -79,17 +79,21 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 					let arg_name = self.state.expect_ident(ids)?;
 					let mut arg_default = None;
 					if self.state.consume_sym(ids, "=")? {
-						arg_default = Some(self.parse_datatype(ids, curr_scope)?);
+						arg_default = Some(self.parse_datatype(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected data type")))?);
 					}
 					args.push(TemplateArg::typename(arg_name, arg_default, attrs));
 				} else {
-					let arg_type = self.parse_datatype(ids, curr_scope)?;
+					let arg_type = self.parse_datatype(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected data type")))?;
 					let arg_name = self.state.expect_ident(ids)?;
 					let mut arg_default = None;
 					if self.state.consume_sym(ids, "=")? {
 						arg_default = Some(self.parse_expression(ids, curr_scope)?);
 					}
 					args.push(TemplateArg::value(arg_name, arg_type, arg_default, attrs));
+				}
+				if !self.state.consume_sym(ids, ",")? {
+					self.state.expect_sym(ids, ">")?;
+					break;
 				}
 			}
 		}
@@ -104,10 +108,59 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(None)
 	}
-	pub fn parse_integral_type(&mut self, ids: &mut IdStringDb, _curr_scope: &dyn Scope) -> Result<IntegerType, ParserError> {
-		unimplemented!()
+	pub fn parse_template_vals(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Vec<TemplateValue>, ParserError> {
+		let mut vals = Vec::new();
+		if self.state.consume_sym(ids, "<")? {
+			while !self.state.consume_sym(ids, ">")? {
+				// Try parse as a type
+				self.state.enter_ambig();
+				let typ = self.parse_datatype(ids, curr_scope)?;
+				if let Some(typ) = typ {
+					self.state.ambig_success(ids)?;
+					vals.push(TemplateValue::Typ(typ))
+				} else {
+					self.state.ambig_failure(ids)?;
+					vals.push(TemplateValue::Expr(self.parse_expression(ids, curr_scope)?))
+				}
+				if !self.state.consume_sym(ids, ",")? {
+					self.state.expect_sym(ids, ">")?;
+					break;
+				}
+			}
+		}
+		Ok(vals)
 	}
-	pub fn parse_datatype(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<DataType, ParserError> {
+	pub fn parse_integral_type(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<IntegerType, ParserError> {
+		// TODO: this is a bit on the liberal side
+		let mut width = Expression::integer(32, 32);
+		let mut is_signed = Expression::integer(1, 1);
+		loop {
+			if self.state.check_kws(&[constids::signed, constids::unsigned]) {
+				if self.state.consume_kw(ids, constids::signed)? { is_signed =  Expression::integer(1, 1); }
+				else if self.state.consume_kw(ids, constids::unsigned)? { is_signed =  Expression::integer(0, 1); }
+				// Could be a C-style type or a Meowality arb-precision int
+				let tv = self.parse_template_vals(ids, curr_scope)?;
+				if tv.len() > 1 {
+					return Err(self.state.err(format!("integer types expect one template argument")));
+				} else if tv.len() == 1 {
+					width = tv[0].as_expr().ok_or_else(|| self.state.err(format!("integer types expect one template argument")))?;
+				}
+			} else if self.state.consume_kw(ids, constids::char)? {
+				width = Expression::integer(8, 32);
+			} else if self.state.consume_kw(ids, constids::short)? {
+				width = Expression::integer(16, 32);
+			} else if self.state.consume_kw(ids, constids::int)? {
+				// no-op as 32 is the default anyway, and we want to support patterns like long int
+			} else if self.state.consume_kw(ids, constids::long)? {
+				width = Expression::integer(64, 32);
+			} else {
+				break;
+			}
+		}
+		Ok(IntegerType{width, is_signed})
+	}
+	// This is a bit natty. Data type parsing can fail in two ways - either totally invalid syntax, or syntax that is potentially valid but definitely not a data type, and in some contexts we might need to try parsing the latter again as something else. We disambiguate between the two with a either an Err (total failure) or None (retry parse as expression).
+	pub fn parse_datatype(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Option<DataType>, ParserError> {
 		let mut is_typename = false;
 		let mut is_const = false;
 		let mut is_static = false;
@@ -126,22 +179,37 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		// Basic type
 		let mut dt : DataTypes = if self.state.consume_kw(ids, constids::auto)? {
 			DataTypes::Auto
+		} else if self.state.consume_kw(ids, constids::void)? {
+			DataTypes::Void
 		} else if self.state.check_kws(INTEGRAL_TYPES) {
 			DataTypes::Integer(self.parse_integral_type(ids, curr_scope)?)
 		} else if let Some(ident) = self.state.consume_ident(ids,)? {
 			// is_typename forces identifier to be a type
 			if is_typename || curr_scope.is_type(ident) {
 				// TODO: template arguments
-				DataTypes::User(UserType{name: ident, args: FxHashMap::default()})
+				DataTypes::User(UserType{name: ident, args: self.parse_template_vals(ids, curr_scope)?})
 			} else {
-				return Err(self.state.err(format!("expected data type, found {}", ident)));
+				return Ok(None);
 			}
 		} else {
-			return Err(self.state.err(format!("failed to parse data type")));
+			return Ok(None);
 		};
-		// Things that can follow
 		let apply_mod = |d| DataType { is_const, is_static, typ: d };
-		Ok(apply_mod(dt))
+		// Things that can follow
+		loop {
+			if self.state.consume_sym(ids, "[")? {
+				let dims = self.parse_expression_list(ids, curr_scope, "]")?;
+				self.state.expect_sym(ids, "]")?;
+				dt = DataTypes::Array(ArrayType { base: Box::new(apply_mod(dt)), dims });
+			} else if self.state.consume_sym(ids, "::")? {
+				dt = DataTypes::ScopedType(Box::new(apply_mod(dt)), self.state.expect_ident(ids)?);
+			} else if self.state.consume_sym(ids, "&")? {
+				dt = DataTypes::Reference(Box::new(apply_mod(dt)))
+			} else {
+				break
+			}
+		}
+		Ok(Some(apply_mod(dt)))
 	}
 	pub fn resolve_ident(&self, curr_scope: &dyn Scope, ident: IdString) -> Result<IdentifierType, ParserError> {
 		self.lookup_ident(curr_scope, ident).ok_or_else(|| self.state.err(format!("unexpected identifier {}", ident)))
@@ -160,5 +228,15 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			return Ok(Expression::new(Variable(id)));
 		}
 		Err(self.state.err(format!("unable to parse expression")))
+	}
+	pub fn parse_expression_list(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope, terminator: &'static str) -> Result<Vec<Expression>, ParserError> {
+		let mut exprs = Vec::new();
+		while !self.state.check_sym(terminator) {
+			exprs.push(self.parse_expression(ids, curr_scope)?);
+			if !self.state.consume_sym(ids, ",")? {
+				break;
+			}
+		}
+		Ok(exprs)
 	}
 }
