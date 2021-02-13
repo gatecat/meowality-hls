@@ -56,6 +56,7 @@ pub const SYMBOLS : &[&'static str] = &[
 pub const KEYWORDS : &[IdString] = &[
 	constids::void,
 	constids::int,
+	constids::short,
 	constids::r#char,
 	constids::r#string,
 	constids::signed,
@@ -82,6 +83,8 @@ pub const KEYWORDS : &[IdString] = &[
 	constids::r#sizeof,
 	constids::block,
 	constids::static_cast,
+	constids::r#const,
+	constids::r#static,
 ];
 
 #[derive(Eq, PartialEq, Clone)]

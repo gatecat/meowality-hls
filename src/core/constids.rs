@@ -4,6 +4,8 @@ constids! {
 	// Keywords
 	void,
 	int,
+	short,
+	long,
 	r#char,
 	r#string,
 	signed,
@@ -22,6 +24,8 @@ constids! {
 	r#else,
 	r#for,
 	r#while,
+	r#const,
+	r#static,
 	multicycle,
 	meta,
 	r#break,

@@ -96,6 +96,14 @@ impl <Iter: Iterator<Item=char>> ParserState<Iter> {
 			_ => false,
 		}
 	}
+	// Check if a symbol is one of a given list of keywords
+	pub fn check_kws(&self, kws: &[IdString]) -> bool {
+		match self.peek() {
+			Some((Keyword(s), _)) => kws.iter().any(|kw| s == kw),
+			Some((Ident(s), _)) => kws.iter().any(|kw| s == kw),
+			_ => false,
+		}
+	}
 	// Check if a symbol is the next token; and consume it if it is
 	pub fn consume_sym(&mut self, ids: &mut IdStringDb, sym: &'static str) -> Result<bool, ParserError> {
 		if self.check_sym(sym) {

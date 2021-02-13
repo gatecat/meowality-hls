@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use crate::ast::*;
 use crate::core::{constids, IdString, IdStringDb};
 use crate::parser::parser_state::*;
@@ -17,6 +18,15 @@ enum OpStackItem {
 	LParen,
 	RParen,
 }
+
+const INTEGRAL_TYPES: &[IdString] = &[
+	constids::signed,
+	constids::unsigned,
+	constids::char,
+	constids::short,
+	constids::long,
+	constids::int,
+];
 
 impl <Iter: Iterator<Item=char>> Parser<Iter> {
 	pub fn new(state: ParserState<Iter>) -> Parser<Iter> {
@@ -94,8 +104,44 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(None)
 	}
-	pub fn parse_datatype(&mut self, _ids: &mut IdStringDb, _curr_scope: &dyn Scope) -> Result<DataType, ParserError> {
+	pub fn parse_integral_type(&mut self, ids: &mut IdStringDb, _curr_scope: &dyn Scope) -> Result<IntegerType, ParserError> {
 		unimplemented!()
+	}
+	pub fn parse_datatype(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<DataType, ParserError> {
+		let mut is_typename = false;
+		let mut is_const = false;
+		let mut is_static = false;
+		// Parse qualifiers
+		loop {
+			if self.state.consume_kw(ids, constids::typename)? {
+				is_typename = true;
+			} else if self.state.consume_kw(ids, constids::r#const)? {
+				is_const = true;
+			} else if self.state.consume_kw(ids, constids::r#static)? {
+				is_static = true;
+			} else {
+				break;
+			}
+		}
+		// Basic type
+		let mut dt : DataTypes = if self.state.consume_kw(ids, constids::auto)? {
+			DataTypes::Auto
+		} else if self.state.check_kws(INTEGRAL_TYPES) {
+			DataTypes::Integer(self.parse_integral_type(ids, curr_scope)?)
+		} else if let Some(ident) = self.state.consume_ident(ids,)? {
+			// is_typename forces identifier to be a type
+			if is_typename || curr_scope.is_type(ident) {
+				// TODO: template arguments
+				DataTypes::User(UserType{name: ident, args: FxHashMap::default()})
+			} else {
+				return Err(self.state.err(format!("expected data type, found {}", ident)));
+			}
+		} else {
+			return Err(self.state.err(format!("failed to parse data type")));
+		};
+		// Things that can follow
+		let apply_mod = |d| DataType { is_const, is_static, typ: d };
+		Ok(apply_mod(dt))
 	}
 	pub fn resolve_ident(&self, curr_scope: &dyn Scope, ident: IdString) -> Result<IdentifierType, ParserError> {
 		self.lookup_ident(curr_scope, ident).ok_or_else(|| self.state.err(format!("unexpected identifier {}", ident)))

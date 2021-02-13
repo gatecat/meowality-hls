@@ -4,8 +4,8 @@ use crate::ast::{Expression, Statement};
 use rustc_hash::FxHashMap;
 
 pub struct IntegerType {
-	pub width: usize,
-	pub is_signed: bool,
+	pub width: Expression,
+	pub is_signed: Expression,
 }
 
 pub struct UserType {
