@@ -59,7 +59,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		while self.state.consume_sym(ids, "[[")? {
 			let attr_name = self.state.expect_ident(ids)?;
 			let attr_value = if self.state.consume_sym(ids, "=")? {
-				self.parse_expression(ids, curr_scope)?
+				self.parse_expression(ids, curr_scope, false)?
 			} else {
 				Expression::new(ExprType::Null)
 			};
@@ -86,7 +86,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 					let arg_name = self.state.expect_ident(ids)?;
 					let mut arg_default = None;
 					if self.state.consume_sym(ids, "=")? {
-						arg_default = Some(self.parse_expression(ids, curr_scope)?);
+						arg_default = Some(self.parse_expression(ids, curr_scope, true)?);
 					}
 					args.push(TemplateArg::value(arg_name, arg_type, arg_default, attrs));
 				}
@@ -119,7 +119,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 					vals.push(TemplateValue::Typ(typ))
 				} else {
 					self.state.ambig_failure(ids)?;
-					vals.push(TemplateValue::Expr(self.parse_expression(ids, curr_scope)?))
+					vals.push(TemplateValue::Expr(self.parse_expression(ids, curr_scope, true)?))
 				}
 				if !self.state.consume_sym(ids, ",")? {
 					self.state.expect_sym(ids, ">")?;
@@ -228,7 +228,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(())
 	}
-	pub fn parse_expression(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Expression, ParserError> {
+	pub fn parse_expression(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope, is_templ_arg: bool) -> Result<Expression, ParserError> {
 		use ExprType::*;
 		// For our cursed shunting-yard-esque expression parsing
 		let mut last_was_operator = true;
@@ -283,6 +283,9 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				expr_stack.push(Expression::new(List(self.parse_expression_list(ids, curr_scope, "}")?)));
 				self.state.expect_sym(ids, "}")?;
 				last_was_operator = false;
+			} else if is_templ_arg && self.state.check_sym(">") && !op_stack.iter().any(|s| match s { OpStackItem::LParen => true, _ => false }) {
+				// special case for end of template argument list (only when no parentheses in stack)
+				break;
 			} else if let Some(op_sym) = self.state.consume_any_sym(ids, Operator::SYMBOLS)? {
 				let op = if last_was_operator {
 					// unary prefix
@@ -295,8 +298,8 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				while !op_stack.is_empty() {
 					match op_stack.last().unwrap() {
 						OpStackItem::Op(top) => {
-							if (op.is_right_assoc() && op.precedence() > top.precedence())
-								|| (!op.is_right_assoc() && op.precedence() >= top.precedence()) {
+							if (op.is_right_assoc() && op.precedence() < top.precedence())
+								|| (!op.is_right_assoc() && op.precedence() <= top.precedence()) {
 								self.pop_op_stack(&mut op_stack, &mut expr_stack)?;
 							} else {
 								break;
@@ -311,12 +314,25 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				break;
 			}
 		}
-		Err(self.state.err(format!("unable to parse expression")))
+		// Finalise stacked operations
+		while !op_stack.is_empty() {
+			match op_stack.last().unwrap() {
+				OpStackItem::Op(_) => self.pop_op_stack(&mut op_stack, &mut expr_stack)?,
+				_ => { return Err(self.state.err(format!("mismatched parentheses in expression"))) }
+			}
+		}
+		if expr_stack.len() > 1 {
+			Err(self.state.err(format!("unable to parse expression, too many items given")))
+		} else if expr_stack.len() == 1 {
+			Ok(expr_stack.pop().unwrap())
+		} else {
+			Ok(Expression::new(Null))
+		}
 	}
 	pub fn parse_expression_list(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope, terminator: &'static str) -> Result<Vec<Expression>, ParserError> {
 		let mut exprs = Vec::new();
 		while !self.state.check_sym(terminator) {
-			exprs.push(self.parse_expression(ids, curr_scope)?);
+			exprs.push(self.parse_expression(ids, curr_scope, terminator==">")?);
 			if !self.state.consume_sym(ids, ",")? {
 				break;
 			}
@@ -381,6 +397,25 @@ pub mod test {
 			},
 			_ => assert!(false)
 		}
+		Ok(())
+	}
+
+	#[test]
+	fn basic_expr() -> Result<(), ParserError> {
+		use ExprType::*;
+		let (mut ids, mut p, r) = setup("4+5*(6+-7)")?;
+		assert_eq!(p.parse_expression(&mut ids, &r, false)?, 
+			Expression::new(Op(Operator::Add, vec![
+				Expression::from_u64(4, 64),
+				Expression::new(Op(Operator::Mul, vec![
+					Expression::from_u64(5, 64),
+					Expression::new(Op(Operator::Add, vec![
+						Expression::from_u64(6, 64),
+						Expression::new(Op(Operator::Negate, vec![Expression::from_u64(7, 64)])),
+					]))
+				]))
+			]))
+		);
 		Ok(())
 	}
 }
