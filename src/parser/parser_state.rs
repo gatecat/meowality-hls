@@ -112,6 +112,19 @@ impl <Iter: Iterator<Item=char>> ParserState<Iter> {
 			Ok(false)
 		}
 	}
+	pub fn consume_any_sym(&mut self, ids: &mut IdStringDb, syms: &[&'static str]) -> Result<Option<&'static str>, ParserError> {
+		match self.peek() {
+			Some((Symbol(s), _)) => {
+				if syms.iter().any(|s2| s == s2) {
+					let s = s.clone();
+					self.get(ids)?;
+					return Ok(Some(s));
+				}
+			},
+			_ => {},
+		}
+		return Ok(None);
+	}
 	// Check if a keyword is the next token; and consume it if it is
 	pub fn consume_kw(&mut self, ids: &mut IdStringDb, kw: IdString) -> Result<bool, ParserError> {
 		match self.peek() {

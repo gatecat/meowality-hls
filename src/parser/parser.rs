@@ -11,6 +11,7 @@ struct Parser<Iter: Iterator<Item=char>> {
 	statement_stack: Vec<Statement>,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum OpStackItem {
 	Op(Operator),
 	LParen,
@@ -212,18 +213,103 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 	pub fn resolve_ident(&self, curr_scope: &dyn Scope, ident: IdString) -> Result<IdentifierType, ParserError> {
 		self.lookup_ident(curr_scope, ident).ok_or_else(|| self.state.err(format!("unexpected identifier {}", ident)))
 	}
-	pub fn parse_expression(&mut self, ids: &mut IdStringDb, _curr_scope: &dyn Scope) -> Result<Expression, ParserError> {
-		use ExprType::*;
-		if let Some(tok) = self.state.consume_literal(ids)? {
-			match tok {
-				Token::IntLiteral(bv) => {
-					return Ok(Expression::new(Literal(bv)));
+	pub fn pop_op_stack(&mut self, op_stack: &mut Vec<OpStackItem>, expr_stack: &mut Vec<Expression>) -> Result<(), ParserError> {
+		let op = op_stack.pop().ok_or_else(|| self.state.err(format!("operation stack underflow")))?;
+		match op {
+			OpStackItem::Op(o) => {
+				let mut args = Vec::new();
+				for _ in 0..o.arg_count() {
+					args.push(expr_stack.pop().ok_or_else(|| self.state.err(format!("too few arguments for operator {}", o.token())))?);
 				}
-				_ => { return Err(self.state.err(format!("unsupported literal {:?}", tok))); }
+				args.reverse();
+				expr_stack.push(Expression::new(ExprType::Op(o, args)));
 			}
-		} else if let Some(id) = self.state.consume_ident(ids)? {
-			// self.resolve_ident(curr_scope, id)?;
-			return Ok(Expression::new(Variable(id)));
+			_ => {}
+		}
+		Ok(())
+	}
+	pub fn parse_expression(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Expression, ParserError> {
+		use ExprType::*;
+		// For our cursed shunting-yard-esque expression parsing
+		let mut last_was_operator = true;
+		let mut op_stack : Vec<OpStackItem> = Vec::new();
+		let mut expr_stack : Vec<Expression> = Vec::new();
+		loop {
+			if let Some(tok) = self.state.consume_literal(ids)? {
+				last_was_operator = false;
+				match tok {
+					Token::IntLiteral(bv) => {
+						expr_stack.push(Expression::new(Literal(bv)));
+					}
+					_ => { return Err(self.state.err(format!("unsupported literal {:?}", tok))); }
+				}
+			} else if let Some(id) = self.state.consume_ident(ids)? {
+				last_was_operator = false;
+				// self.resolve_ident(curr_scope, id)?;
+				expr_stack.push(Expression::new(Variable(id)));
+			} else if self.state.consume_sym(ids, "(")? {
+				if last_was_operator {
+					// parentheses
+					op_stack.push(OpStackItem::LParen);
+				} else {
+					// function call
+					let target = expr_stack.pop().unwrap();
+					let templ_vals = self.parse_template_vals(ids, curr_scope)?;
+					expr_stack.push(Expression::new(Func(
+						FuncCall {
+							target: Box::new(target),
+							targs: templ_vals,
+							args: self.parse_expression_list(ids, curr_scope, ")")?
+						}
+					)));
+					self.state.expect_sym(ids, ")")?;
+				}
+				last_was_operator = true;
+			} else if self.state.check_sym(")") {
+				while !op_stack.is_empty() && op_stack.last().cloned() != Some(OpStackItem::LParen) {
+					self.pop_op_stack(&mut op_stack, &mut expr_stack)?;
+				}
+				if op_stack.is_empty() {
+					// underflow, don't swallow bracket as something else is expecting it as a terminator
+					break;
+				} else {
+					// end of potentially nested brackets, safe to swallow terminator
+					self.state.expect_sym(ids, ")")?;
+					assert_eq!(op_stack.pop(), Some(OpStackItem::LParen));
+				}
+				last_was_operator = false;
+			} else if self.state.check_sym("{") {
+				// initialiser list
+				expr_stack.push(Expression::new(List(self.parse_expression_list(ids, curr_scope, "}")?)));
+				self.state.expect_sym(ids, "}")?;
+				last_was_operator = false;
+			} else if let Some(op_sym) = self.state.consume_any_sym(ids, Operator::SYMBOLS)? {
+				let op = if last_was_operator {
+					// unary prefix
+					Operator::lookup(op_sym, 1, false)
+				} else {
+					// binary or unary postfix
+					Operator::lookup(op_sym, 2, false).or_else(|| Operator::lookup(op_sym, 1, true))
+				}.unwrap();
+				// shunting yard
+				while !op_stack.is_empty() {
+					match op_stack.last().unwrap() {
+						OpStackItem::Op(top) => {
+							if (op.is_right_assoc() && op.precedence() > top.precedence())
+								|| (!op.is_right_assoc() && op.precedence() >= top.precedence()) {
+								self.pop_op_stack(&mut op_stack, &mut expr_stack)?;
+							} else {
+								break;
+							}
+						}
+						_ => break,
+					}
+				}
+				op_stack.push(OpStackItem::Op(op));
+				last_was_operator = true;
+			} else {
+				break;
+			}
 		}
 		Err(self.state.err(format!("unable to parse expression")))
 	}
