@@ -212,7 +212,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 	pub fn resolve_ident(&self, curr_scope: &dyn Scope, ident: IdString) -> Result<IdentifierType, ParserError> {
 		self.lookup_ident(curr_scope, ident).ok_or_else(|| self.state.err(format!("unexpected identifier {}", ident)))
 	}
-	pub fn parse_expression(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Expression, ParserError> {
+	pub fn parse_expression(&mut self, ids: &mut IdStringDb, _curr_scope: &dyn Scope) -> Result<Expression, ParserError> {
 		use ExprType::*;
 		if let Some(tok) = self.state.consume_literal(ids)? {
 			match tok {
@@ -222,7 +222,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				_ => { return Err(self.state.err(format!("unsupported literal {:?}", tok))); }
 			}
 		} else if let Some(id) = self.state.consume_ident(ids)? {
-			self.resolve_ident(curr_scope, id)?;
+			// self.resolve_ident(curr_scope, id)?;
 			return Ok(Expression::new(Variable(id)));
 		}
 		Err(self.state.err(format!("unable to parse expression")))
@@ -290,7 +290,7 @@ pub mod test {
 		match dt.typ {
 			User(ut) => {
 				assert_eq!(ut.name, ids.id("our_struct"));
-				assert_eq!(ut.args[0].as_type(), Some( DataType { typ: Integer( IntegerType { width: Expression::from_u64(19, 64), is_signed: Expression::from_u64(0, 64) }), is_const: false, is_static: false } ));
+				assert_eq!(ut.args[0].as_type(), Some( DataType { typ: Integer( IntegerType { width: Expression::from_u64(19, 64), is_signed: Expression::from_u64(0, 1) }), is_const: false, is_static: false } ));
 				assert_eq!(ut.args[1].as_expr(), Some( Expression::new(ExprType::Variable(ids.id("our_const"))) ));
 			},
 			_ => assert!(false)

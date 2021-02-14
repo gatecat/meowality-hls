@@ -9,7 +9,7 @@ pub struct ParserState<Iter: Iterator<Item=char>>  {
 	tokeniser: Tokeniser<Iter>,
 	toks: VecDeque<(Token, LineCol)>,
 	ptr: usize,
-	ambig_mode: bool,
+	ambig_stack: Vec<usize>,
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -35,7 +35,7 @@ impl <Iter: Iterator<Item=char>> ParserState<Iter> {
 			tokeniser: tok,
 			toks: VecDeque::new(),
 			ptr: 0,
-			ambig_mode: false,
+			ambig_stack: Vec::new(),
 		};
 		p.update_lookahead(ids, 1)?;
 		Ok(p)
@@ -59,7 +59,7 @@ impl <Iter: Iterator<Item=char>> ParserState<Iter> {
 	}
 	pub fn get(&mut self, ids: &mut IdStringDb) -> Result<(Token, LineCol), ParserError> {
 		self.update_lookahead(ids, 2)?;
-		if self.ambig_mode {
+		if !self.ambig_stack.is_empty() {
 			let t = self.toks.get(self.ptr).ok_or(self.err(format!("unexpected end of file")))?;
 			self.ptr += 1;
 			Ok(t.clone())
@@ -69,23 +69,22 @@ impl <Iter: Iterator<Item=char>> ParserState<Iter> {
 	}
 	// In ambiguous mode, we don't really eat the tokens but just pretend to; as we might need to backtrack
 	pub fn enter_ambig(&mut self) {
-		self.ptr = 0;
-		self.ambig_mode = true;
+		self.ambig_stack.push(self.ptr)
 	}
 	// Ambiguous mode ended successfully, found an unambiguous match, now commit by actually eating the tokens
 	pub fn ambig_success(&mut self, ids: &mut IdStringDb) -> Result<(), ParserError> {
-		for _ in 0..self.ptr {
+		let next_ptr = self.ambig_stack.pop().unwrap();
+		for _ in next_ptr..self.ptr {
 			self.toks.pop_front();
 		}
-		self.ptr = 0;
-		self.ambig_mode = false;
+		self.ptr = next_ptr;
 		self.update_lookahead(ids, 1)?;
 		Ok(())
 	}
 	// Ambiguous mode hasn't resolved (yet), backtrack so we can try parsing differently
 	pub fn ambig_failure(&mut self, ids: &mut IdStringDb) -> Result<(), ParserError> {
-		self.ptr = 0;
-		self.ambig_mode = false;
+		let next_ptr = self.ambig_stack.pop().unwrap();
+		self.ptr = next_ptr;
 		self.update_lookahead(ids, 1)?;
 		Ok(())
 	}
@@ -214,6 +213,7 @@ mod test {
 		assert_eq!(ps.consume_sym(&mut ids, "::")?, true);
 		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("foo")));
 		ps.ambig_failure(&mut ids)?;
+		ps.enter_ambig();
 		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("mytype")));
 		assert_eq!(ps.consume_sym(&mut ids, "::")?, true);
 		assert_eq!(ps.consume_ident(&mut ids)?, Some(ids.id("foo")));

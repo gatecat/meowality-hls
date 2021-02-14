@@ -204,7 +204,7 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 			// parse as symbol token
 			self.update_lookahead(self.max_symbol_len);
 			for s in SYMBOLS {
-				if s.chars().enumerate().all(|(i, c)| *self.lookahead.get(i).unwrap() == c) {
+				if s.chars().enumerate().all(|(i, c)| self.lookahead.get(i).cloned() == Some(c)) {
 					for _ in 0..s.len() {
 						self.get();
 					}
