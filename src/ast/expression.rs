@@ -142,7 +142,13 @@ impl Expression {
 			src: src,
 		}
 	}
-	pub fn integer(i: u64, len: usize) -> Expression {
+	pub fn from_u64(i: u64, len: usize) -> Expression {
 		Expression::new(ExprType::Literal(BitVector::from_u64(i, len)))
+	}
+	pub fn as_u64(&self) -> Option<u64> {
+		match &self.ty {
+			ExprType::Literal(x) => Some(x.as_u64()),
+			_ => None
+		}
 	}
 }

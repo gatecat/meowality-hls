@@ -9,8 +9,6 @@ struct Parser<Iter: Iterator<Item=char>> {
 	// for scope resolution
 	namespace_stack: Vec<Namespace>,
 	statement_stack: Vec<Statement>,
-	// the result of the parser is the root namespace
-	root: Namespace,
 }
 
 enum OpStackItem {
@@ -34,7 +32,6 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			state: state,
 			namespace_stack: Vec::new(),
 			statement_stack: Vec::new(),
-			root: Namespace::new(None, AttributeList::new(), SrcInfo::default()),
 		}
 	}
 	pub fn lookup_ident(&self, curr_scope: &dyn Scope, ident: IdString) -> Option<IdentifierType> {
@@ -66,6 +63,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				Expression::new(ExprType::Null)
 			};
 			attrs.0.push(Attribute {name: attr_name, value: attr_value});
+			self.state.expect_sym(ids, "]]")?;
 		}
 		Ok(attrs)
 	}
@@ -132,12 +130,12 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 	}
 	pub fn parse_integral_type(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<IntegerType, ParserError> {
 		// TODO: this is a bit on the liberal side
-		let mut width = Expression::integer(32, 32);
-		let mut is_signed = Expression::integer(1, 1);
+		let mut width = Expression::from_u64(32, 32);
+		let mut is_signed = Expression::from_u64(1, 1);
 		loop {
 			if self.state.check_kws(&[constids::signed, constids::unsigned]) {
-				if self.state.consume_kw(ids, constids::signed)? { is_signed =  Expression::integer(1, 1); }
-				else if self.state.consume_kw(ids, constids::unsigned)? { is_signed =  Expression::integer(0, 1); }
+				if self.state.consume_kw(ids, constids::signed)? { is_signed =  Expression::from_u64(1, 1); }
+				else if self.state.consume_kw(ids, constids::unsigned)? { is_signed =  Expression::from_u64(0, 1); }
 				// Could be a C-style type or a Meowality arb-precision int
 				let tv = self.parse_template_vals(ids, curr_scope)?;
 				if tv.len() > 1 {
@@ -146,13 +144,13 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 					width = tv[0].as_expr().ok_or_else(|| self.state.err(format!("integer types expect one template argument")))?;
 				}
 			} else if self.state.consume_kw(ids, constids::char)? {
-				width = Expression::integer(8, 32);
+				width = Expression::from_u64(8, 32);
 			} else if self.state.consume_kw(ids, constids::short)? {
-				width = Expression::integer(16, 32);
+				width = Expression::from_u64(16, 32);
 			} else if self.state.consume_kw(ids, constids::int)? {
 				// no-op as 32 is the default anyway, and we want to support patterns like long int
 			} else if self.state.consume_kw(ids, constids::long)? {
-				width = Expression::integer(64, 32);
+				width = Expression::from_u64(64, 32);
 			} else {
 				break;
 			}
@@ -238,5 +236,65 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			}
 		}
 		Ok(exprs)
+	}
+}
+
+#[cfg(test)]
+pub mod test {
+	use crate::parser::Tokeniser;
+	use super::*;
+	fn setup(s: &'static str) -> Result<(IdStringDb, Parser<std::str::Chars>, Namespace), ParserError> {
+		let mut ids = IdStringDb::new();
+		constids::do_ids_init(&mut ids);
+		let tok = Tokeniser::new(ids.id("<test>"), s.chars());
+		let ps = ParserState::new(tok, &mut ids)?;
+		let p = Parser::new(ps);
+		let root = Namespace::new(None, AttributeList::new(), SrcInfo::default());
+		Ok((ids, p, root))
+	}
+
+	#[test]
+	fn prim_types() -> Result<(), ParserError> {
+		use DataTypes::*;
+		let (mut ids, mut p, r) = setup("char; unsigned<33>; unsigned short int; signed;")?;
+		let exp_types = &[(8, true), (33, false), (16, false), (32, true)];
+		for (width, is_signed) in exp_types {
+			let dt = p.parse_datatype(&mut ids, &r)?.unwrap();
+			match dt.typ {
+				Integer(i) => {
+					assert_eq!(i.width.as_u64(), Some(*width));
+					assert_eq!(i.is_signed.as_u64().map(|x| x != 0), Some(*is_signed));
+				}
+				_ => assert!(false)
+			}
+			p.state.expect_sym(&mut ids, ";")?;
+		}
+		Ok(())
+	}
+
+	#[test]
+	fn attrs() -> Result<(), ParserError> {
+		let (mut ids, mut p, r) = setup("[[attr=11]] [[another_attr]]")?;
+		assert_eq!(p.parse_attrs(&mut ids, &r)?, AttributeList(vec![
+			Attribute { name: ids.id("attr"), value: Expression::from_u64(11, 64) },
+			Attribute { name: ids.id("another_attr"), value: Expression::new(ExprType::Null) }
+		]));
+		Ok(())
+	}
+
+	#[test]
+	fn complex_types() -> Result<(), ParserError> {
+		use DataTypes::*;
+		let (mut ids, mut p, r) = setup("typename our_struct<unsigned<19>, our_const>")?;
+		let dt = p.parse_datatype(&mut ids, &r)?.unwrap();
+		match dt.typ {
+			User(ut) => {
+				assert_eq!(ut.name, ids.id("our_struct"));
+				assert_eq!(ut.args[0].as_type(), Some( DataType { typ: Integer( IntegerType { width: Expression::from_u64(19, 64), is_signed: Expression::from_u64(0, 64) }), is_const: false, is_static: false } ));
+				assert_eq!(ut.args[1].as_expr(), Some( Expression::new(ExprType::Variable(ids.id("our_const"))) ));
+			},
+			_ => assert!(false)
+		}
+		Ok(())
 	}
 }
