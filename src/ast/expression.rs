@@ -125,7 +125,7 @@ pub enum ExprType {
 	Null,
 	Literal(BitVector),
 	Variable(IdString),
-	ScopedVariable(Box<Expression>, IdString),
+	MemberAccess(Box<Expression>, IdString),
 	TemplateArg(IdString),
 	List(Vec<Expression>),
 	Op(Operator, Vec<Expression>),

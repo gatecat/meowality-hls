@@ -11,6 +11,7 @@ constids! {
 	signed,
 	unsigned,
 	auto,
+	auto_int,
 	operator,
 	template,
 	typename,

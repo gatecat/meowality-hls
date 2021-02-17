@@ -57,6 +57,7 @@ pub struct ArrayType {
 pub enum DataTypes {
 	Void,
 	Auto,
+	AutoInt,
 	TemplParam(IdString),
 	ScopedType(Box<DataType>, IdString),
 	Integer(IntegerType),
@@ -108,7 +109,7 @@ impl TemplateArg {
 pub struct StructureDef {
 	pub name: IdString,
 	pub templ_args: Vec<TemplateArg>,
-	pub items: Vec<Statement>,
+	pub block: Box<Statement>,
 	pub attrs: AttributeList,
 	pub src: SrcInfo,
 }

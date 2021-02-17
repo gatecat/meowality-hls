@@ -133,6 +133,13 @@ pub struct Statement {
 use StatementType::*;
 
 impl Statement {
+	pub fn new(ty: StatementType, attrs: AttributeList) -> Statement {
+		Statement {
+			ty: ty,
+			attrs: attrs,
+			src: SrcInfo::default(),
+		}
+	}
 	pub fn num_children(&self) -> usize {
 		match &self.ty {
 			If(i) => if i.if_false.is_some() { 2 } else { 1 },
@@ -141,7 +148,7 @@ impl Statement {
 			Multicycle(_) => 1,
 			Function(_) => 1,
 			Module(_) => 1,
-			Struct(s) => s.items.len(),
+			Struct(_) => 1,
 			_ => 0,
 		}
 	}
@@ -161,7 +168,7 @@ impl Statement {
 			Multicycle(s) => if i == 0 { return &s.content },
 			Module(s) => if i == 0 { return &s.content },
 			Function(s) => if i == 0 { return &s.content },
-			Struct(s) => { return s.items.get(i).unwrap(); }
+			Struct(s) => if i == 0 { return &s.block },
 			_ => {}
 		}
 		panic!("invalid statement child request");

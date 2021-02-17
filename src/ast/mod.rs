@@ -7,7 +7,7 @@ pub mod namespace;
 
 pub use base::{LineCol, SrcInfo, Attribute, AttributeList};
 pub use datatype::{IntegerType, UserType, TemplateValue, ArrayType, DataTypes, DataType, TemplateArg, TemplateArgType, StructureDef};
-pub use expression::{Operator, FuncCall, ExprType, Expression};
-pub use statement::{Statement, Module, Function};
+pub use expression::{Operator, FuncCall, ExprType, ArrayAccess, Expression};
+pub use statement::{VariableDecl, TypedefDecl, UsingDecl, IfStatement, ForLoop, StatementType, Statement, Module, Function};
 pub use namespace::Namespace;
 pub use scope::{IdentifierType, Scope};

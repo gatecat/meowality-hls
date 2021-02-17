@@ -98,14 +98,54 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(args)
 	}
+	pub fn parse_block(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Statement, ParserError> {
+		unimplemented!();
+	}
 	pub fn parse_statement(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Option<Statement>, ParserError> {
 		let attrs = self.parse_attrs(ids, curr_scope)?;
+		let tdecl = self.parse_template_decl(ids, curr_scope)?;
+		use StatementType::*;
 		if self.state.consume_kw(ids, constids::typedef)? {
-			// typedef
+			let ty = self.parse_datatype(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected data type after typedef")))?;
+			let name = self.state.expect_ident(ids)?;
+			self.state.expect_sym(ids, ";")?;
+			Ok(Some(Statement::new(
+				Typedef(TypedefDecl {
+					name: name,
+					ty: ty,
+				}), attrs
+			)))
 		} else if self.state.consume_kw(ids, constids::using)? {
-			// using 
+			// using
+			let name = self.state.expect_ident(ids)?;
+			self.state.expect_sym(ids, "=")?;
+			let ty = self.parse_datatype(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected data type after typedef")))?;
+			self.state.expect_sym(ids, ";")?;
+			Ok(Some(Statement::new(
+				Using(UsingDecl {
+					name: name,
+					ty: ty,
+				}), attrs
+			)))
+		} else if self.state.consume_kw(ids, constids::r#struct)? {
+			let name = self.state.expect_ident(ids)?;
+			// TODO: inheritance
+			let content = self.parse_block(ids, curr_scope)?;
+			self.state.expect_sym(ids, ";")?;
+			Ok(Some(Statement::new(
+				Struct(StructureDef {
+					name: name,
+					templ_args: tdecl,
+					block: Box::new(content),
+					attrs: attrs.clone(),
+					src: SrcInfo::default(),
+				}), attrs
+			)))
+		} else if self.state.consume_sym(ids, ";")? {
+			Ok(Some(Statement::new(Null, attrs)))
+		} else {
+			Ok(None)
 		}
-		Ok(None)
 	}
 	pub fn parse_template_vals(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Vec<TemplateValue>, ParserError> {
 		let mut vals = Vec::new();
@@ -180,6 +220,8 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			DataTypes::Auto
 		} else if self.state.consume_kw(ids, constids::void)? {
 			DataTypes::Void
+		} else if self.state.consume_kw(ids, constids::auto_int)? {
+			DataTypes::AutoInt
 		} else if self.state.check_kws(INTEGRAL_TYPES) {
 			DataTypes::Integer(self.parse_integral_type(ids, curr_scope)?)
 		} else if let Some(ident) = self.state.consume_ident(ids,)? {
@@ -282,6 +324,17 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				// initialiser list
 				expr_stack.push(Expression::new(List(self.parse_expression_list(ids, curr_scope, "}")?)));
 				self.state.expect_sym(ids, "}")?;
+				last_was_operator = false;
+			} else if self.state.check_sym(".") {
+				let prev = expr_stack.pop().ok_or_else(|| self.state.err(format!("expected expression before .")))?;
+				expr_stack.push(Expression::new(MemberAccess(Box::new(prev), self.state.expect_ident(ids)?)));
+				last_was_operator = false;
+			} else if self.state.check_sym("[") {
+				let prev = expr_stack.pop().ok_or_else(|| self.state.err(format!("expected expression before [")))?;
+				expr_stack.push(Expression::new(ArrAcc(ArrayAccess {
+					array: Box::new(prev),
+					indices: self.parse_expression_list(ids, curr_scope, "]")?
+				})));
 				last_was_operator = false;
 			} else if is_templ_arg && self.state.check_sym(">") && !op_stack.iter().any(|s| match s { OpStackItem::LParen => true, _ => false }) {
 				// special case for end of template argument list (only when no parentheses in stack)
