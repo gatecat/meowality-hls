@@ -119,8 +119,9 @@ pub enum StatementType {
 	Break,
 	Continue,
 	Module(Module),
-	Function(Function),
+	Func(Function),
 	Struct(StructureDef),
+	Expr(Expression),
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -146,7 +147,7 @@ impl Statement {
 			For(_) => 2,
 			Block(s) => s.len(),
 			Multicycle(_) => 1,
-			Function(_) => 1,
+			Func(_) => 1,
 			Module(_) => 1,
 			Struct(_) => 1,
 			_ => 0,
@@ -167,7 +168,7 @@ impl Statement {
 			Block(s) => { return s.get(i).unwrap() },
 			Multicycle(s) => if i == 0 { return &s.content },
 			Module(s) => if i == 0 { return &s.content },
-			Function(s) => if i == 0 { return &s.content },
+			Func(s) => if i == 0 { return &s.content },
 			Struct(s) => if i == 0 { return &s.block },
 			_ => {}
 		}
@@ -175,7 +176,7 @@ impl Statement {
 	}
 	pub fn templ_args(&self) -> &[TemplateArg] {
 		match &self.ty {
-			Function(s) => { return &s.templ_args },
+			Func(s) => { return &s.templ_args },
 			Struct(s) => { return &s.templ_args },
 			Module(s) => { return &s.templ_args },
 			_ => &[],
@@ -192,7 +193,7 @@ impl Statement {
 	}
 	pub fn leaf_is_func(&self, ident: IdString) -> bool {
 		match &self.ty {
-			Function(s) => s.name == ident,
+			Func(s) => s.name == ident,
 			_ => false,
 		}
 	}

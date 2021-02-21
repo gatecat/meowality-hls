@@ -144,7 +144,68 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		} else if self.state.consume_sym(ids, ";")? {
 			Ok(Some(Statement::new(Null, attrs)))
 		} else {
-			Ok(None)
+			// Attempt to parse as a data type (variable or function)
+			self.state.enter_ambig();
+			let typ = self.parse_datatype(ids, curr_scope)?;
+			if let Some(typ) = typ {
+				self.state.ambig_success(ids)?;
+				// variable, or function
+				// TODO: multiple variables in a list - need to refactor to produce a list of statements
+				let name = self.state.expect_ident(ids)?;
+				if self.state.consume_sym(ids, "(")? {
+					// function
+					let mut args = Vec::new();
+					while !self.state.check_sym(")") {
+						let arg_attrs = self.parse_attrs(ids, curr_scope)?;
+						let arg_typ = self.parse_datatype(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected data type in function arg list")))?;
+						let arg_name = self.state.expect_ident(ids)?;
+						let mut arg_init = None;
+						if self.state.consume_sym(ids, "=")? {
+							arg_init = Some(self.parse_expression(ids, curr_scope, false)?);
+						}
+						args.push(FunctionArg {
+							attrs: arg_attrs,
+							name: arg_name,
+							data_type: arg_typ,
+							default: arg_init,
+						});
+						if !self.state.consume_sym(ids, ",")? {
+							continue;
+						}
+					}
+					self.state.expect_sym(ids, ")")?;
+					let content = self.parse_statement(ids, curr_scope)?.unwrap();
+					Ok(Some(Statement::new(Func(
+						Function {
+							attrs: attrs.clone(),
+							name: name,
+							ret_type: typ,
+							func_args: args,
+							templ_args: tdecl,
+							content: Box::new(content),
+							src: SrcInfo::default(),
+						}
+					), attrs)))
+				} else {
+					// variable
+					let mut init = None;
+					if self.state.consume_sym(ids, "=")? {
+						init = Some(self.parse_expression(ids, curr_scope, false)?);
+					}
+					Ok(Some(Statement::new(Var(
+						VariableDecl {
+							name: name,
+							ty: typ,
+							init: init,
+						}
+					), attrs)))
+				}
+			} else {
+				self.state.ambig_failure(ids)?;
+				// probably an expression
+				let expr = self.parse_expression(ids, curr_scope, false)?;
+				Ok(Some(Statement::new(Expr(expr), attrs)))
+			}
 		}
 	}
 	pub fn parse_template_vals(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Vec<TemplateValue>, ParserError> {
