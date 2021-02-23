@@ -10,4 +10,4 @@ pub use datatype::{IntegerType, UserType, TemplateValue, ArrayType, DataTypes, D
 pub use expression::{Operator, FuncCall, ExprType, ArrayAccess, Expression};
 pub use statement::{VariableDecl, TypedefDecl, UsingDecl, IfStatement, ForLoop, StatementType, Statement, Module, Function, FunctionArg};
 pub use namespace::Namespace;
-pub use scope::{IdentifierType, Scope};
+pub use scope::{IdentifierType, ScopeLevel};

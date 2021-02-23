@@ -1,6 +1,6 @@
 use crate::core::IdString;
 use crate::ast::base::*;
-use crate::ast::{Scope, Statement};
+use crate::ast::{Statement};
 
 pub enum NamespaceItem {
 	Namespace(Box<Namespace>),
@@ -22,20 +22,5 @@ impl Namespace {
 			attrs: attrs,
 			src: src,
 		}
-	}
-}
-
-impl Scope for Namespace {
-	fn is_type(&self, ident: IdString) -> bool {
-		self.content.iter().any(|c| match c { NamespaceItem::Stmt(s) => s.leaf_is_type(ident), _ => false })
-	}
-	fn is_func(&self, ident: IdString) -> bool {
-		self.content.iter().any(|c| match c { NamespaceItem::Stmt(s) => s.leaf_is_func(ident), _ => false })
-	}
-	fn is_var(&self, ident: IdString) -> bool {
-		self.content.iter().any(|c| match c { NamespaceItem::Stmt(s) => s.leaf_is_func(ident), _ => false })
-	}
-	fn get_decls<'a>(&'a self) -> Vec<&'a Statement> {
-		self.content.iter().filter_map(|c| match c { NamespaceItem::Stmt(s) => Some(s), _ => None }).collect()
 	}
 }

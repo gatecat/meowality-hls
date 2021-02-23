@@ -1,7 +1,6 @@
 use crate::core::IdString;
 use crate::ast::base::*;
 use crate::ast::{DataType, Expression, StructureDef, TemplateArg, TemplateArgType};
-use crate::ast::Scope;
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct VariableDecl {
@@ -227,33 +226,4 @@ impl <'a> Iterator for StatementIter<'a> {
 			Some(result)
 		}
 	}
-}
-
-impl Scope for Statement {
-	fn is_type(&self, ident: IdString) -> bool {
-		for targ in self.templ_args() {
-			if targ.name == ident {
-				match targ.arg_type {
-					TemplateArgType::Typename{default: _} => { return true },
-					_ => {}
-				}
-			}
-		}
-		return self.children().any(|c| c.leaf_is_type(ident));
-	}
-	fn is_func(&self, ident: IdString) -> bool {
-		return self.children().any(|c| c.leaf_is_func(ident));
-	}
-	fn is_var(&self, ident: IdString) -> bool {
-		for targ in self.templ_args() {
-			if targ.name == ident {
-				match targ.arg_type {
-					TemplateArgType::Value{t: _, default: _} => { return true },
-					_ => {}
-				}
-			}
-		}
-		return self.children().any(|c| c.leaf_is_var(ident));
-	}
-	fn get_decls<'a>(&'a self) -> Vec<&'a Statement> { self.children().collect() }
 }

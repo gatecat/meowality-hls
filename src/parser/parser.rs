@@ -35,26 +35,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			statement_stack: Vec::new(),
 		}
 	}
-	pub fn lookup_ident(&self, curr_scope: &dyn Scope, ident: IdString) -> Option<IdentifierType> {
-		let curr_lookup = curr_scope.lookup_ident(ident);
-		if curr_lookup.is_some() {
-			return curr_lookup;
-		}
-		for st in self.statement_stack.iter().rev() {
-			let st_lookup = st.lookup_ident(ident);
-			if st_lookup.is_some() {
-				return st_lookup;
-			}
-		}
-		for ns in self.namespace_stack.iter().rev() {
-			let ns_lookup = ns.lookup_ident(ident);
-			if ns_lookup.is_some() {
-				return ns_lookup;
-			}
-		}
-		return None;
-	}
-	pub fn parse_attrs(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<AttributeList, ParserError> {
+	pub fn parse_attrs(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<AttributeList, ParserError> {
 		let mut attrs = AttributeList::new();
 		while self.state.consume_sym(ids, "[[")? {
 			let attr_name = self.state.expect_ident(ids)?;
@@ -68,7 +49,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(attrs)
 	}
-	pub fn parse_template_decl(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Vec<TemplateArg>, ParserError> {
+	pub fn parse_template_decl(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<Vec<TemplateArg>, ParserError> {
 		let mut args = Vec::new();
 		if self.state.consume_kw(ids, constids::template)? {
 			self.state.expect_sym(ids, "<")?;
@@ -98,10 +79,16 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(args)
 	}
-	pub fn parse_block(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Statement, ParserError> {
-		unimplemented!();
+	pub fn parse_block(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<Statement, ParserError> {
+		let block_scope = ScopeLevel { parent: Some(curr_scope) };
+		let mut sts = Vec::new();	
+		self.state.expect_sym(ids, "{")?;
+		while !self.state.consume_sym(ids, "}")? {
+			sts.push(self.parse_statement(ids, &block_scope)?.unwrap());
+		}
+		Ok(Statement::new(StatementType::Block(sts), AttributeList::new()))
 	}
-	pub fn parse_statement(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Option<Statement>, ParserError> {
+	pub fn parse_statement(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<Option<Statement>, ParserError> {
 		let attrs = self.parse_attrs(ids, curr_scope)?;
 		let tdecl = self.parse_template_decl(ids, curr_scope)?;
 		use StatementType::*;
@@ -208,7 +195,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			}
 		}
 	}
-	pub fn parse_template_vals(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Vec<TemplateValue>, ParserError> {
+	pub fn parse_template_vals(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<Vec<TemplateValue>, ParserError> {
 		let mut vals = Vec::new();
 		if self.state.consume_sym(ids, "<")? {
 			while !self.state.consume_sym(ids, ">")? {
@@ -230,7 +217,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(vals)
 	}
-	pub fn parse_integral_type(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<IntegerType, ParserError> {
+	pub fn parse_integral_type(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<IntegerType, ParserError> {
 		// TODO: this is a bit on the liberal side
 		let mut width = Expression::from_u64(32, 32);
 		let mut is_signed = Expression::from_u64(1, 1);
@@ -260,7 +247,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		Ok(IntegerType{width, is_signed})
 	}
 	// This is a bit natty. Data type parsing can fail in two ways - either totally invalid syntax, or syntax that is potentially valid but definitely not a data type, and in some contexts we might need to try parsing the latter again as something else. We disambiguate between the two with a either an Err (total failure) or None (retry parse as expression).
-	pub fn parse_datatype(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope) -> Result<Option<DataType>, ParserError> {
+	pub fn parse_datatype(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<Option<DataType>, ParserError> {
 		let mut is_typename = false;
 		let mut is_const = false;
 		let mut is_static = false;
@@ -287,7 +274,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			DataTypes::Integer(self.parse_integral_type(ids, curr_scope)?)
 		} else if let Some(ident) = self.state.consume_ident(ids,)? {
 			// is_typename forces identifier to be a type
-			if is_typename || curr_scope.is_type(ident) {
+			if is_typename /*|| curr_scope.is_type(ident)*/ {
 				// TODO: template arguments
 				DataTypes::User(UserType{name: ident, args: self.parse_template_vals(ids, curr_scope)?})
 			} else {
@@ -313,9 +300,6 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(Some(apply_mod(dt)))
 	}
-	pub fn resolve_ident(&self, curr_scope: &dyn Scope, ident: IdString) -> Result<IdentifierType, ParserError> {
-		self.lookup_ident(curr_scope, ident).ok_or_else(|| self.state.err(format!("unexpected identifier {}", ident)))
-	}
 	pub fn pop_op_stack(&mut self, op_stack: &mut Vec<OpStackItem>, expr_stack: &mut Vec<Expression>) -> Result<(), ParserError> {
 		let op = op_stack.pop().ok_or_else(|| self.state.err(format!("operation stack underflow")))?;
 		match op {
@@ -331,7 +315,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(())
 	}
-	pub fn parse_expression(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope, is_templ_arg: bool) -> Result<Expression, ParserError> {
+	pub fn parse_expression(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel, is_templ_arg: bool) -> Result<Expression, ParserError> {
 		use ExprType::*;
 		// For our cursed shunting-yard-esque expression parsing
 		let mut last_was_operator = true;
@@ -443,7 +427,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			Ok(Expression::new(Null))
 		}
 	}
-	pub fn parse_expression_list(&mut self, ids: &mut IdStringDb, curr_scope: &dyn Scope, terminator: &'static str) -> Result<Vec<Expression>, ParserError> {
+	pub fn parse_expression_list(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel, terminator: &'static str) -> Result<Vec<Expression>, ParserError> {
 		let mut exprs = Vec::new();
 		while !self.state.check_sym(terminator) {
 			exprs.push(self.parse_expression(ids, curr_scope, terminator==">")?);
@@ -475,7 +459,7 @@ pub mod test {
 		let (mut ids, mut p, r) = setup("char; unsigned<33>; unsigned short int; signed;")?;
 		let exp_types = &[(8, true), (33, false), (16, false), (32, true)];
 		for (width, is_signed) in exp_types {
-			let dt = p.parse_datatype(&mut ids, &r)?.unwrap();
+			let dt = p.parse_datatype(&mut ids, &ScopeLevel { parent: None })?.unwrap();
 			match dt.typ {
 				Integer(i) => {
 					assert_eq!(i.width.as_u64(), Some(*width));
@@ -491,7 +475,7 @@ pub mod test {
 	#[test]
 	fn attrs() -> Result<(), ParserError> {
 		let (mut ids, mut p, r) = setup("[[attr=11]] [[another_attr]]")?;
-		assert_eq!(p.parse_attrs(&mut ids, &r)?, AttributeList(vec![
+		assert_eq!(p.parse_attrs(&mut ids, &ScopeLevel { parent: None })?, AttributeList(vec![
 			Attribute { name: ids.id("attr"), value: Expression::from_u64(11, 64) },
 			Attribute { name: ids.id("another_attr"), value: Expression::new(ExprType::Null) }
 		]));
@@ -502,7 +486,7 @@ pub mod test {
 	fn complex_types() -> Result<(), ParserError> {
 		use DataTypes::*;
 		let (mut ids, mut p, r) = setup("typename our_struct<unsigned<19>, our_const>")?;
-		let dt = p.parse_datatype(&mut ids, &r)?.unwrap();
+		let dt = p.parse_datatype(&mut ids, &ScopeLevel { parent: None })?.unwrap();
 		match dt.typ {
 			User(ut) => {
 				assert_eq!(ut.name, ids.id("our_struct"));
@@ -518,7 +502,7 @@ pub mod test {
 	fn basic_expr() -> Result<(), ParserError> {
 		use ExprType::*;
 		let (mut ids, mut p, r) = setup("4+5*(6+-7)")?;
-		assert_eq!(p.parse_expression(&mut ids, &r, false)?, 
+		assert_eq!(p.parse_expression(&mut ids, &ScopeLevel { parent: None }, false)?, 
 			Expression::new(Op(Operator::Add, vec![
 				Expression::from_u64(4, 64),
 				Expression::new(Op(Operator::Mul, vec![
