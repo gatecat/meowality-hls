@@ -190,15 +190,10 @@ impl Statement {
 			_ => false,
 		}
 	}
-	pub fn leaf_is_func(&self, ident: IdString) -> bool {
-		match &self.ty {
-			Func(s) => s.name == ident,
-			_ => false,
-		}
-	}
 	pub fn leaf_is_var(&self, ident: IdString) -> bool {
 		match &self.ty {
 			Var(s) => s.name == ident,
+			Func(s) => s.name == ident,
 			_ => false,
 		}
 	}

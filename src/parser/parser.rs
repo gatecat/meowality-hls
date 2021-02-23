@@ -80,11 +80,10 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		Ok(args)
 	}
 	pub fn parse_block(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<Statement, ParserError> {
-		let block_scope = ScopeLevel { parent: Some(curr_scope) };
 		let mut sts = Vec::new();	
 		self.state.expect_sym(ids, "{")?;
 		while !self.state.consume_sym(ids, "}")? {
-			sts.push(self.parse_statement(ids, &block_scope)?.unwrap());
+			sts.push(self.parse_statement(ids, &ScopeLevel { parent: Some(curr_scope), entry: &sts })?.unwrap());
 		}
 		Ok(Statement::new(StatementType::Block(sts), AttributeList::new()))
 	}
@@ -117,7 +116,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		} else if self.state.consume_kw(ids, constids::r#struct)? {
 			let name = self.state.expect_ident(ids)?;
 			// TODO: inheritance
-			let content = self.parse_block(ids, curr_scope)?;
+			let content = self.parse_block(ids, &ScopeLevel { parent: Some(curr_scope), entry: &StructHeaderEntry { name: name } })?;
 			self.state.expect_sym(ids, ";")?;
 			Ok(Some(Statement::new(
 				Struct(StructureDef {
@@ -459,7 +458,7 @@ pub mod test {
 		let (mut ids, mut p, r) = setup("char; unsigned<33>; unsigned short int; signed;")?;
 		let exp_types = &[(8, true), (33, false), (16, false), (32, true)];
 		for (width, is_signed) in exp_types {
-			let dt = p.parse_datatype(&mut ids, &ScopeLevel { parent: None })?.unwrap();
+			let dt = p.parse_datatype(&mut ids, &ScopeLevel { parent: None, entry: &NullEntry })?.unwrap();
 			match dt.typ {
 				Integer(i) => {
 					assert_eq!(i.width.as_u64(), Some(*width));
@@ -475,7 +474,7 @@ pub mod test {
 	#[test]
 	fn attrs() -> Result<(), ParserError> {
 		let (mut ids, mut p, r) = setup("[[attr=11]] [[another_attr]]")?;
-		assert_eq!(p.parse_attrs(&mut ids, &ScopeLevel { parent: None })?, AttributeList(vec![
+		assert_eq!(p.parse_attrs(&mut ids, &ScopeLevel { parent: None, entry: &NullEntry })?, AttributeList(vec![
 			Attribute { name: ids.id("attr"), value: Expression::from_u64(11, 64) },
 			Attribute { name: ids.id("another_attr"), value: Expression::new(ExprType::Null) }
 		]));
@@ -486,7 +485,7 @@ pub mod test {
 	fn complex_types() -> Result<(), ParserError> {
 		use DataTypes::*;
 		let (mut ids, mut p, r) = setup("typename our_struct<unsigned<19>, our_const>")?;
-		let dt = p.parse_datatype(&mut ids, &ScopeLevel { parent: None })?.unwrap();
+		let dt = p.parse_datatype(&mut ids, &ScopeLevel { parent: None, entry: &NullEntry })?.unwrap();
 		match dt.typ {
 			User(ut) => {
 				assert_eq!(ut.name, ids.id("our_struct"));
@@ -502,7 +501,7 @@ pub mod test {
 	fn basic_expr() -> Result<(), ParserError> {
 		use ExprType::*;
 		let (mut ids, mut p, r) = setup("4+5*(6+-7)")?;
-		assert_eq!(p.parse_expression(&mut ids, &ScopeLevel { parent: None }, false)?, 
+		assert_eq!(p.parse_expression(&mut ids, &ScopeLevel { parent: None, entry: &NullEntry }, false)?, 
 			Expression::new(Op(Operator::Add, vec![
 				Expression::from_u64(4, 64),
 				Expression::new(Op(Operator::Mul, vec![
