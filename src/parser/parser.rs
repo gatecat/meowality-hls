@@ -127,6 +127,52 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 					src: SrcInfo::default(),
 				}), attrs
 			)))
+		} else if self.state.consume_kw(ids, constids::r#if)? {
+			// if statement
+			let is_meta = self.state.consume_kw(ids, constids::r#meta)?;
+			self.state.expect_sym(ids, "(")?;
+			let cond = self.parse_expression(ids, curr_scope, false)?;
+			self.state.expect_sym(ids, ")")?;
+			let if_true = self.parse_statement(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected statement after if")))?;
+			let mut if_false = None;
+			if self.state.consume_kw(ids, constids::r#else)? {
+				if_false = Some(Box::new(self.parse_statement(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected statement after else")))?));
+			}
+			Ok(Some(Statement::new(
+				If(IfStatement {
+					cond: cond,
+					if_true: Box::new(if_true),
+					if_false: if_false,
+					is_meta: is_meta,
+				}), attrs
+			)))
+		} else if self.state.consume_kw(ids, constids::r#for)? {
+			let is_meta = self.state.consume_kw(ids, constids::r#meta)?;
+			// TODO: range based for
+			self.state.expect_sym(ids, "(")?;
+			let init = self.parse_statement(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected statement after for(")))?;
+			let cond = self.parse_expression(ids, curr_scope, false)?;
+			self.state.expect_sym(ids, ";")?;
+			let incr = self.parse_expression(ids, curr_scope, false)?;
+			self.state.expect_sym(ids, ")")?;
+			let body = self.parse_statement(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected statement after for()")))?;
+			Ok(Some(Statement::new(
+				For(ForLoop {
+					init: Box::new(init),
+					cond: cond,
+					incr: incr,
+					body: Box::new(body),
+					is_meta: is_meta
+				}), attrs
+			)))
+		} else if self.state.consume_kw(ids, constids::r#return)? {
+			Ok(Some(Statement::new(
+				Return(self.parse_expression(ids, curr_scope, false)?), attrs
+			)))
+		} else if self.state.consume_kw(ids, constids::r#break)? {
+			Ok(Some(Statement::new(Break, attrs)))
+		} else if self.state.consume_kw(ids, constids::r#continue)? {
+			Ok(Some(Statement::new(Continue, attrs)))
 		} else if self.state.consume_sym(ids, ";")? {
 			Ok(Some(Statement::new(Null, attrs)))
 		} else {
