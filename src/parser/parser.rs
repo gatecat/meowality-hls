@@ -87,6 +87,28 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		}
 		Ok(Statement::new(StatementType::Block(sts), AttributeList::new()))
 	}
+	pub fn parse_arglist(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<Vec<FunctionArg>, ParserError> {
+		let mut args = Vec::new();
+		while !self.state.check_sym(")") {
+			let arg_attrs = self.parse_attrs(ids, curr_scope)?;
+			let arg_typ = self.parse_datatype(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected data type in function arg list")))?;
+			let arg_name = self.state.expect_ident(ids)?;
+			let mut arg_init = None;
+			if self.state.consume_sym(ids, "=")? {
+				arg_init = Some(self.parse_expression(ids, curr_scope, false)?);
+			}
+			args.push(FunctionArg {
+				attrs: arg_attrs,
+				name: arg_name,
+				data_type: arg_typ,
+				default: arg_init,
+			});
+			if !self.state.consume_sym(ids, ",")? {
+				continue;
+			}
+		}
+		Ok(args)
+	}
 	pub fn parse_statement(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<Option<Statement>, ParserError> {
 		let attrs = self.parse_attrs(ids, curr_scope)?;
 		let tdecl = self.parse_template_decl(ids, curr_scope)?;
@@ -173,6 +195,45 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			Ok(Some(Statement::new(Break, attrs)))
 		} else if self.state.consume_kw(ids, constids::r#continue)? {
 			Ok(Some(Statement::new(Continue, attrs)))
+		} else if self.state.consume_kw(ids, constids::r#return)? {
+			Ok(Some(Statement::new(Return(self.parse_expression(ids, curr_scope, false)?), attrs)))
+		} else if self.state.consume_kw(ids, constids::r#block)? {
+			let module_name = self.state.expect_ident(ids)?;
+			self.state.expect_sym(ids, "(")?;
+			let inputs = self.parse_arglist(ids, curr_scope)?;
+			self.state.expect_sym(ids, ")")?;
+			self.state.expect_sym(ids, "->")?;
+			self.state.expect_sym(ids, "(")?;
+			let outputs = self.parse_arglist(ids, curr_scope)?;
+			self.state.expect_sym(ids, ")")?;
+			let mut io = Vec::new();
+			for i in inputs.iter() {
+				// TODO: clock, reset, enable
+				io.push(ModuleIO {
+					name: i.name,
+					arg_type: i.data_type.clone(),
+					dir: IODir::Input,
+				});
+			}
+			for o in outputs.iter() {
+				io.push(ModuleIO {
+					name: o.name,
+					arg_type: o.data_type.clone(),
+					dir: IODir::Output,
+				});
+			}
+			let content = self.parse_statement(ids, curr_scope)?.unwrap();
+			Ok(Some(Statement::new(Module(statement::Module {
+				name: module_name,
+				templ_args: tdecl,
+				attrs: attrs.clone(),
+				clock: None,
+				enable: None,
+				reset: None,
+				content: Box::new(content),
+				ports: io,
+				src: SrcInfo::default(),
+			}), attrs)))
 		} else if self.state.consume_sym(ids, ";")? {
 			Ok(Some(Statement::new(Null, attrs)))
 		} else {
@@ -186,25 +247,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				let name = self.state.expect_ident(ids)?;
 				if self.state.consume_sym(ids, "(")? {
 					// function
-					let mut args = Vec::new();
-					while !self.state.check_sym(")") {
-						let arg_attrs = self.parse_attrs(ids, curr_scope)?;
-						let arg_typ = self.parse_datatype(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected data type in function arg list")))?;
-						let arg_name = self.state.expect_ident(ids)?;
-						let mut arg_init = None;
-						if self.state.consume_sym(ids, "=")? {
-							arg_init = Some(self.parse_expression(ids, curr_scope, false)?);
-						}
-						args.push(FunctionArg {
-							attrs: arg_attrs,
-							name: arg_name,
-							data_type: arg_typ,
-							default: arg_init,
-						});
-						if !self.state.consume_sym(ids, ",")? {
-							continue;
-						}
-					}
+					let args = self.parse_arglist(ids, curr_scope)?;
 					self.state.expect_sym(ids, ")")?;
 					let content = self.parse_statement(ids, curr_scope)?.unwrap();
 					Ok(Some(Statement::new(Func(
