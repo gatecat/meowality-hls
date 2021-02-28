@@ -4,7 +4,7 @@ use crate::core::{constids, IdString, IdStringDb};
 use crate::parser::parser_state::*;
 use crate::parser::token::*;
 
-struct Parser<Iter: Iterator<Item=char>> {
+pub struct Parser<Iter: Iterator<Item=char>> {
 	state: ParserState<Iter>,
 	// for scope resolution
 	namespace_stack: Vec<Namespace>,
@@ -12,7 +12,7 @@ struct Parser<Iter: Iterator<Item=char>> {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum OpStackItem {
+pub enum OpStackItem {
 	Op(Operator),
 	LParen,
 	RParen,
@@ -34,6 +34,14 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			namespace_stack: Vec::new(),
 			statement_stack: Vec::new(),
 		}
+	}
+	pub fn do_parse(&mut self, ids: &mut IdStringDb) ->  Result<Vec<Statement>, ParserError> {
+		// TODO: namespace
+		let mut sts = Vec::new();
+		while self.state.peek().is_some() {
+			sts.push(self.parse_statement(ids, &ScopeLevel { parent: None, entry: &sts })?.unwrap());
+		}
+		Ok(sts)
 	}
 	pub fn parse_attrs(&mut self, ids: &mut IdStringDb, curr_scope: &ScopeLevel) -> Result<AttributeList, ParserError> {
 		let mut attrs = AttributeList::new();
@@ -113,7 +121,9 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 		let attrs = self.parse_attrs(ids, curr_scope)?;
 		let tdecl = self.parse_template_decl(ids, curr_scope)?;
 		use StatementType::*;
-		if self.state.consume_kw(ids, constids::typedef)? {
+		if self.state.check_sym("{") {
+			Ok(Some(self.parse_block(ids, curr_scope)?))
+		} else if self.state.consume_kw(ids, constids::typedef)? {
 			let ty = self.parse_datatype(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected data type after typedef")))?;
 			let name = self.state.expect_ident(ids)?;
 			self.state.expect_sym(ids, ";")?;
@@ -174,7 +184,6 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			self.state.expect_sym(ids, "(")?;
 			let init = self.parse_statement(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected statement after for(")))?;
 			let cond = self.parse_expression(ids, curr_scope, false)?;
-			self.state.expect_sym(ids, ";")?;
 			let incr = self.parse_expression(ids, curr_scope, false)?;
 			self.state.expect_sym(ids, ")")?;
 			let body = self.parse_statement(ids, curr_scope)?.ok_or_else(|| self.state.err(format!("expected statement after for()")))?;
@@ -188,15 +197,17 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				}), attrs
 			)))
 		} else if self.state.consume_kw(ids, constids::r#return)? {
+			let expr = self.parse_expression(ids, curr_scope, false)?;
+			self.state.expect_sym(ids, ";")?;
 			Ok(Some(Statement::new(
-				Return(self.parse_expression(ids, curr_scope, false)?), attrs
+				Return(expr), attrs
 			)))
 		} else if self.state.consume_kw(ids, constids::r#break)? {
+			self.state.expect_sym(ids, ";")?;
 			Ok(Some(Statement::new(Break, attrs)))
 		} else if self.state.consume_kw(ids, constids::r#continue)? {
+			self.state.expect_sym(ids, ";")?;
 			Ok(Some(Statement::new(Continue, attrs)))
-		} else if self.state.consume_kw(ids, constids::r#return)? {
-			Ok(Some(Statement::new(Return(self.parse_expression(ids, curr_scope, false)?), attrs)))
 		} else if self.state.consume_kw(ids, constids::r#block)? {
 			let module_name = self.state.expect_ident(ids)?;
 			self.state.expect_sym(ids, "(")?;
@@ -250,6 +261,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 					let args = self.parse_arglist(ids, curr_scope)?;
 					self.state.expect_sym(ids, ")")?;
 					let content = self.parse_statement(ids, curr_scope)?.unwrap();
+					self.state.expect_sym(ids, ";")?;
 					Ok(Some(Statement::new(Func(
 						Function {
 							attrs: attrs.clone(),
@@ -267,6 +279,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 					if self.state.consume_sym(ids, "=")? {
 						init = Some(self.parse_expression(ids, curr_scope, false)?);
 					}
+					self.state.expect_sym(ids, ";")?;
 					Ok(Some(Statement::new(Var(
 						VariableDecl {
 							name: name,
@@ -279,6 +292,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				self.state.ambig_failure(ids)?;
 				// probably an expression
 				let expr = self.parse_expression(ids, curr_scope, false)?;
+				self.state.expect_sym(ids, ";")?;
 				Ok(Some(Statement::new(Expr(expr), attrs)))
 			}
 		}
