@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::ast::base::*;
 use crate::ast::TemplateValue;
 use crate::core::IdString;
@@ -165,5 +167,44 @@ impl Expression {
 			ExprType::Literal(x) => Some(x.as_u64()),
 			_ => None
 		}
+	}
+}
+
+impl fmt::Display for Expression {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use ExprType::*;
+		match &self.ty {
+			Null => {},
+			Literal(l) => write!(f, "{}", l)?,
+			Variable(v) => write!(f, "{:?}", v)?,
+			MemberAccess(base, m) => write!(f, "{}.{:?}", base, m)?,
+			TemplateArg(t) => write!(f, "{:?}", t)?,
+			List(exprs) => {
+				write!(f, "{{")?;
+				for e in exprs.iter() { write!(f, "{},", e)?; }
+				write!(f, "}}")?;
+			},
+			Op(o, exprs) => {
+				if !o.is_postfix() { write!(f, "{}", o.token())?; }
+				write!(f, "({})", exprs[0])?;
+				if o.is_postfix() { write!(f, "{}", o.token())?; }
+				if exprs.len() == 2 { write!(f, "({})", exprs[1])?; }
+			},
+			Func(fc) => {
+				write!(f, "{}(", fc.target)?;
+				// TODO: template
+				for e in fc.args.iter() { write!(f, "{},", e)?; }
+				write!(f, ")")?;
+			},
+			ArrAcc(a) => {
+				write!(f, "{}[", a.array)?;
+				// TODO: template
+				for e in a.indices.iter() { write!(f, "{},", e)?; }
+				write!(f, "]")?;
+			},
+			Slice(s) => write!(f, "{}[{}:{}]", s.array, s.start, s.end)?,
+			Builtin(_) => { unimplemented!() } 
+		};
+		Ok(())
 	}
 }

@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::core::{BitVector, IdString};
 use crate::ast::base::*;
 use crate::ast::{Expression, Statement};
@@ -73,6 +74,39 @@ pub struct DataType {
 	pub typ: DataTypes,
 	pub is_static: bool,
 	pub is_const: bool,
+}
+
+impl fmt::Display for DataType {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use DataTypes::*;
+		if self.is_static { write!(f, "static ")?; }
+		if self.is_const { write!(f, "const ")?; }
+		match &self.typ {
+			Void => write!(f, "void")?,
+			Auto => write!(f, "auto")?,
+			AutoInt => write!(f, "auto_int")?,
+			TemplParam(t) => write!(f, "{:?}", t)?,
+			ScopedType(base, t) => write!(f, "{}::{:?}", base, t)?,
+			Integer(it) => write!(f, "integer<{}, {}>", it.is_signed, it.width )?,
+			User(ut) => {
+				write!(f, "{}", ut.name)?;
+				if !ut.args.is_empty() {
+					write!(f, "<")?;
+					for a in ut.args.iter() { write!(f, "{:?}", a)?; }
+					write!(f, ">")?;
+				}
+			},
+			Reference(r) => write!(f, "{}&", r)?,
+			Array(a) => {
+				write!(f, "{}[", a.base)?;
+				// TODO: template
+				for e in a.dims.iter() { write!(f, "{},", e)?; }
+				write!(f, "]")?;
+			},
+			_ => unimplemented!()
+		}
+		Ok(())
+	}
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]
