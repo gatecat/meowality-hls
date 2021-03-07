@@ -27,7 +27,7 @@ fn main() -> Result<(), String> {
 	let mut p = Parser::new(ps);
 	let sts = p.do_parse(&mut ids).map_err(|e| e.msg.to_string())?;
 	for st in sts.iter() {
-		println!("{:#?}", st.ty);
+		println!("{}", st);
 	}
 	Ok(())
 }

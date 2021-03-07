@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::core::IdString;
 use crate::ast::base::*;
 use crate::ast::{DataType, Expression, StructureDef, TemplateArg, TemplateArgType};
@@ -203,7 +205,99 @@ impl Statement {
 			i: 0,
 		}
 	}
+
+	fn write_targs<T: std::fmt::Write>(stream: &mut T, args: &[TemplateArg]) -> fmt::Result {
+		if !args.is_empty() {
+			write!(stream, "template <")?;
+			for arg in args.iter() {
+				write!(stream, "{}, ", arg)?;
+			}
+			write!(stream, "> ")?;
+		}
+		Ok(())
+	}
+
+	pub fn dump<T: std::fmt::Write>(&self, stream: &mut T, indent: usize, newline: bool) -> fmt::Result {
+		write!(stream, "{:indent$}", "", indent=indent)?;
+		use StatementType::*;
+		match &self.ty {
+			Null => write!(stream, ";")?,
+			Typedef(td) => write!(stream, "typedef {} {:?};", td.ty, td.name)?,
+			Using(ud) => write!(stream, "using {} = {:?};", ud.ty, ud.name)?,
+			Var(v) => {
+				write!(stream, "{} {:?}", v.ty, v.name)?;
+				if let Some(i) = &v.init { write!(stream, " = {}", i)?; };
+				write!(stream, ";")?;
+			},
+			If(i) => {
+				writeln!(stream, "if {}({})", if i.is_meta {"meta "} else {""}, i.cond)?;
+				i.if_true.dump(stream, indent + 2, true)?;
+				if let Some(f) = &i.if_false {
+					writeln!(stream, "{:indent$}else", "", indent=indent)?;
+					f.dump(stream, indent + 2, true)?;
+				}
+			},
+			For(f) => {
+				writeln!(stream, "for {}(", if f.is_meta {"meta "} else {""})?;
+				f.init.dump(stream, 0, false)?;
+				writeln!(stream, "{};{})", f.cond, f.incr)?;
+				f.body.dump(stream, indent + 2, true)?;
+			},
+			Block(b) => {
+				writeln!(stream, "{{")?;
+				for s in b.iter() { s.dump(stream, indent + 2, true)?; }
+				writeln!(stream, "{:indent$}}}", "", indent=indent)?;
+			},
+			Return(e) => write!(stream, "return {};", e)?,
+			Break => write!(stream, "break;")?,
+			Continue => write!(stream, "continue;")?,
+			Module(m) => {
+				Self::write_targs(stream, &m.templ_args)?;
+				write!(stream, "module {:?}(", m.name)?;
+				if let Some(_) = &m.clock { write!(stream, "clock, ")?; }
+				if let Some(_) = &m.enable { write!(stream, "enable, ")?; }
+				if let Some(_) = &m.reset { write!(stream, "reset, ")?; }
+				for p in m.ports.iter().filter(|p| p.dir == IODir::Input) {
+					write!(stream, "{} {},", p.arg_type, p.name)?;
+				}
+				write!(stream, ") -> (")?;
+				for p in m.ports.iter().filter(|p| p.dir == IODir::Output) {
+					write!(stream, "{} {},", p.arg_type, p.name)?;
+				}
+				writeln!(stream, ")")?;
+				m.content.dump(stream, indent + 2, true)?;
+			},
+			Func(f) => {
+				Self::write_targs(stream, &f.templ_args)?;
+				write!(stream, "{} {:?}(", f.ret_type, f.name)?;
+				for a in f.func_args.iter() {
+					write!(stream, "{} {}", a.data_type, a.name)?;
+					if let Some(d) = &a.default { write!(stream, " = {}", d)?; }
+					write!(stream, ",")?;
+				}
+				write!(stream, ")")?;
+				f.content.dump(stream, indent + 2, true)?;
+			},
+			Struct(s) => {
+				Self::write_targs(stream, &s.templ_args)?;
+				write!(stream, "struct {:?}", s.name)?;
+				s.block.dump(stream, indent + 2, true)?;
+			},
+			Expr(e) => write!(stream, "{}", e)?,
+			_ => unimplemented!(),
+		}
+		if newline { writeln!(stream, "")?; }
+		Ok(())
+	}
 }
+
+impl fmt::Display for Statement {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		self.dump(f, 0, true)?;
+		Ok(())
+	}
+}
+
 
 pub struct StatementIter<'a> {
 	st: &'a Statement,

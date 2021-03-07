@@ -139,6 +139,22 @@ impl TemplateArg {
 	}
 }
 
+impl fmt::Display for TemplateArg {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match &self.arg_type {
+			TemplateArgType::Value{t, default} => {
+				write!(f, "{} {}", t, self.name)?;
+				if let Some(d) = default { write!(f, " = {}", d)?; }
+			},
+			TemplateArgType::Typename{default} => {
+				write!(f, "typename {}", self.name)?;
+				if let Some(d) = default { write!(f, " = {}", d)?; }
+			},
+		}
+		Ok(())
+	}
+}
+
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct StructureDef {
 	pub name: IdString,
