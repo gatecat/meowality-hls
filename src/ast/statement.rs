@@ -258,11 +258,11 @@ impl Statement {
 				if let Some(_) = &m.enable { write!(stream, "enable, ")?; }
 				if let Some(_) = &m.reset { write!(stream, "reset, ")?; }
 				for p in m.ports.iter().filter(|p| p.dir == IODir::Input) {
-					write!(stream, "{} {},", p.arg_type, p.name)?;
+					write!(stream, "{} {:?},", p.arg_type, p.name)?;
 				}
 				write!(stream, ") -> (")?;
 				for p in m.ports.iter().filter(|p| p.dir == IODir::Output) {
-					write!(stream, "{} {},", p.arg_type, p.name)?;
+					write!(stream, "{} {:?},", p.arg_type, p.name)?;
 				}
 				writeln!(stream, ")")?;
 				m.content.dump(stream, indent + 2, true)?;
@@ -271,7 +271,7 @@ impl Statement {
 				Self::write_targs(stream, &f.templ_args)?;
 				write!(stream, "{} {:?}(", f.ret_type, f.name)?;
 				for a in f.func_args.iter() {
-					write!(stream, "{} {}", a.data_type, a.name)?;
+					write!(stream, "{} {:?}", a.data_type, a.name)?;
 					if let Some(d) = &a.default { write!(stream, " = {}", d)?; }
 					write!(stream, ",")?;
 				}

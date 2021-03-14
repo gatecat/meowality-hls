@@ -175,7 +175,13 @@ impl fmt::Display for Expression {
 		use ExprType::*;
 		match &self.ty {
 			Null => {},
-			Literal(l) => write!(f, "{}", l)?,
+			Literal(l) => {
+				if l.len() <= 64 {
+					write!(f, "{}", l.as_u64())?
+				} else {
+					write!(f, "{}", l)?
+				}
+			},
 			Variable(v) => write!(f, "{:?}", v)?,
 			MemberAccess(base, m) => write!(f, "{}.{:?}", base, m)?,
 			TemplateArg(t) => write!(f, "{:?}", t)?,
@@ -185,9 +191,9 @@ impl fmt::Display for Expression {
 				write!(f, "}}")?;
 			},
 			Op(o, exprs) => {
-				if !o.is_postfix() { write!(f, "{}", o.token())?; }
+				if !o.is_postfix() && exprs.len() == 1 { write!(f, "{}", o.token())?; }
 				write!(f, "({})", exprs[0])?;
-				if o.is_postfix() { write!(f, "{}", o.token())?; }
+				if o.is_postfix() || exprs.len() > 1 { write!(f, "{}", o.token())?; }
 				if exprs.len() == 2 { write!(f, "({})", exprs[1])?; }
 			},
 			Func(fc) => {

@@ -14,6 +14,31 @@ use crate::parser::*;
 
 use std::env;
 
+fn conv_ids(ids: &IdStringDb, s: &str) -> String {
+	let mut result = String::new();
+	let mut buf = String::new();
+	let mut in_id = false;
+	for c in s.chars() {
+		if !in_id {
+			// not in IdString
+			if c == '`' {
+				in_id = true;
+			} else {
+				result.push(c);
+			}
+		} else {
+			if c == '`' {
+				result.push_str(ids.get_str(IdString { index: buf.parse::<u32>().unwrap() }));
+				buf.clear();
+				in_id = false;
+			} else {
+				buf.push(c);
+			}
+		}
+	}
+	result
+}
+
 fn main() -> Result<(), String> {
 	let args: Vec<String> = env::args().collect();
 	let mut ids = IdStringDb::new();
@@ -27,7 +52,8 @@ fn main() -> Result<(), String> {
 	let mut p = Parser::new(ps);
 	let sts = p.do_parse(&mut ids).map_err(|e| e.msg.to_string())?;
 	for st in sts.iter() {
-		println!("{}", st);
+		let raw_st = format!("{}", st);
+		println!("{}", &conv_ids(&ids, &raw_st));
 	}
 	Ok(())
 }

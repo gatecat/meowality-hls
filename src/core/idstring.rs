@@ -23,7 +23,7 @@ impl fmt::Debug for IdString {
 		// We can't convert an IdString to a concrete string at this stage as we don't have a reference to the context
 		// So we insert a placeholder string instead; which the final stage of error reporting with context access will replace
 		// This way we don't have to rewrite Rust's formatting infrastructure
-		write!(f, "$(id={})", self.index)
+		write!(f, "`{}`", self.index)
 	}
 }
 
