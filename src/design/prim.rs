@@ -1,32 +1,6 @@
-use crate::core::{BitVector, Constant, IdString, StoreIndex};
+use crate::core::{BasicOp, BitVector, Constant, IdString, StoreIndex};
 use crate::design::Node;
 use rustc_hash::FxHashMap;
-
-// The standard C type operations
-pub enum BasicOperation {
-	Add,
-	Sub,
-	Mul,
-	Div,
-	Mod,
-	Neg,
-	Eq,
-	Neq,
-	Gt,
-	Lt,
-	GtEq,
-	LtEq,
-	Shl,
-	Shr,
-	BwAnd,
-	BwOr,
-	BwXor,
-	BwNot,
-	LogAnd,
-	LogOr,
-	LogNot,
-	LogCast,
-}
 
 // Special operations for certain hardware-y things
 pub enum SpecialOperation {
@@ -46,7 +20,7 @@ pub enum Register {
 }
 
 pub enum PrimitiveType {
-	BasicOp(BasicOperation),
+	BasicOp(BasicOp),
 	SpecOp(SpecialOperation),
 	Reg(Register),
 }
