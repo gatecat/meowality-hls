@@ -1,3 +1,4 @@
+use crate::core::{State, BitVector};
 
 // Operand type
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -63,7 +64,7 @@ pub enum BasicOp {
 }
 
 impl BasicOp {
-	pub fn result_width(&self, t: &[OperandType]) -> OperandType {
+	pub fn result_type(&self, t: &[OperandType]) -> OperandType {
 		use BasicOp::*;
 		match &self {
 			Add | Sub => OperandType::merge(t[0], t[1]).extend(1),
@@ -77,5 +78,39 @@ impl BasicOp {
 			BwNot => t[0],
 			LogAnd | LogOr | LogNot | LogCast => OperandType::BOOL,
 		}
+	}
+	pub fn apply(&self, operands: &[BitVector]) -> BitVector {
+		use BasicOp::*;
+		// Up to two arguments
+		let mut types = [OperandType::BOOL; 2];
+		for (i, op) in operands.iter().enumerate() {
+			types[i] = op.op_type();
+		}
+		let result_type = self.result_type(&types[0..operands.len()]);
+		let mut result = BitVector::new(result_type.width, result_type.is_signed);
+		match &self {
+			Add => {
+				let mut carry = State::S0;
+				for i in 0..result.len() {
+					let a = operands[0].get_ext(i);
+					let b = operands[1].get_ext(i);
+					result.set(i, a ^ b ^ carry);
+					carry = (a & b) | (a & carry) | (b & carry);	
+				}
+
+			}
+			_ => unimplemented!()
+		}
+		result
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	#[test]
+	fn add() {
+		assert_eq!(BasicOp::Add.apply(&[BitVector::from_u64(42, 8), BitVector::from_u64(69, 8)]), BitVector::from_u64(111, 9));
+		assert_eq!(BasicOp::Add.apply(&[BitVector::from_u64(42, 8), BitVector::from_i64(-1, 8)]), BitVector::from_i64(41, 10));
 	}
 }

@@ -1,4 +1,5 @@
-use crate::core::StoreIndex;
+use std::ops::{BitAnd, BitOr, BitXor, Not};
+use crate::core::{OperandType, StoreIndex};
 use std::cmp::max;
 use std::fmt;
 
@@ -47,6 +48,58 @@ impl State {
 	}
 }
 
+impl BitAnd for State {
+	type Output = Self;
+	fn bitand(self, r: State) -> State {
+		use State::*;
+		match (self, r) {
+			(S1, S1) => S1,
+			(S0, _) => S0,
+			(_, S0) => S0,
+			(_, _) => Sx
+		}
+	}
+}
+
+impl BitOr for State {
+	type Output = Self;
+	fn bitor(self, r: State) -> State {
+		use State::*;
+		match (self, r) {
+			(S0, S0) => S0,
+			(S1, _) => S1,
+			(_, S1) => S1,
+			(_, _) => Sx
+		}
+	}
+}
+
+impl BitXor for State {
+	type Output = Self;
+	fn bitxor(self, r: State) -> State {
+		use State::*;
+		match (self, r) {
+			(S0, S0) => S0,
+			(S1, S0) => S1,
+			(S0, S1) => S1,
+			(S1, S1) => S0,
+			(_, _) => Sx
+		}
+	}
+}
+
+impl Not for State {
+	type Output = Self;
+	fn not(self) -> State {
+		use State::*;
+		match self {
+			S0 => S1,
+			S1 => S0,
+			_ => Sx,
+		}
+	}
+}
+
 // An efficient way of storing four-value vectors;
 // where we mainly care about the 'defined' part
 //
@@ -82,25 +135,34 @@ impl FourValChunk {
 #[derive(Eq, PartialEq, Clone)]
 pub struct BitVector {
 	pub length: usize,
+	pub is_signed: bool,
 	pub chunks: Vec<FourValChunk>,
 }
 
 impl BitVector {
-	pub fn new(len: usize) -> BitVector {
+	pub fn new(len: usize, is_signed: bool) -> BitVector {
 		BitVector {
 			length: len,
+			is_signed: is_signed,
 			chunks: vec![ FourValChunk::default(); max(1, (len + 63) / 64)]
 		}
 	}
 	pub fn from_u64(val: u64, len: usize) -> BitVector {
-		let mut result = BitVector::new(len);
+		let mut result = BitVector::new(len, false);
 		if len > 0 {
 			result.chunks[0].value = val;
 		}
 		return result;
 	}
+	pub fn from_i64(val: i64, len: usize) -> BitVector {
+		let mut result = BitVector::new(len, true);
+		if len > 0 {
+			result.chunks[0].value = val as u64;
+		}
+		return result;
+	}
 	pub fn from_bits(bits: &[State]) -> BitVector {
-		let mut result = BitVector::new(bits.len());
+		let mut result = BitVector::new(bits.len(), false);
 		for (i, b) in bits.iter().enumerate() {
 			result.chunks[i / 64].set(i % 64, *b);
 		}
@@ -112,6 +174,17 @@ impl BitVector {
 			Some(self.chunks[i / 64].get(i % 64))
 		} else {
 			None
+		}
+	}
+	pub fn get_ext(&self, i: usize) -> State {
+		if i < self.length {
+			self.chunks[i / 64].get(i % 64)
+		} else {
+			if self.length == 0 || !self.is_signed {
+				State::S0
+			} else {
+				self.get_ext(self.length - 1)
+			}
 		}
 	}
 	pub fn set(&mut self, i: usize, s: State) {
@@ -139,11 +212,14 @@ impl BitVector {
 		(0..self.len()).rev().map(|i| self.get(i).unwrap().to_char()).collect()
 	}
 	pub fn from_str(s: &str) -> BitVector {
-		let mut result = BitVector::new(s.len());
+		let mut result = BitVector::new(s.len(), false);
 		for (i, c) in s.chars().rev().enumerate() {
 			result.chunks[i / 64].set(i % 64, State::from_char(c).unwrap());
 		}
 		return result;
+	}
+	pub fn op_type(&self) -> OperandType {
+		OperandType::new(self.length, self.is_signed)
 	}
 }
 

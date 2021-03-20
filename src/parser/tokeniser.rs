@@ -177,7 +177,7 @@ impl <Iter: Iterator<Item=char>> Tokeniser<Iter> {
 				x => Err(self.err(format!("invalid base '{}', use 0o as a prefix for octal literals", x)))
 			}?;
 			let base = 1<<base_l2;
-			let mut bv = BitVector::new((self.buf.len() - 2) * base_l2);
+			let mut bv = BitVector::new((self.buf.len() - 2) * base_l2, false);
 			for i in 0..(self.buf.len() - 2) {
 				let ch_idx = (self.buf.len() - 1) - i;
 				// This looks bad but we know there is no UTF-8 at this point

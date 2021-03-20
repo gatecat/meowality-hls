@@ -18,4 +18,4 @@ pub use logging::ToStrWithCtx;
 pub use named_store::{NamedItem, NamedStore};
 pub use nullable::{Nullable, NullValue};
 pub use object_store::{StoreIndex, NullableIndex, ObjectStore};
-pub use operation::BasicOp;
+pub use operation::{BasicOp, OperandType};
