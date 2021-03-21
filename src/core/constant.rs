@@ -221,6 +221,9 @@ impl BitVector {
 	pub fn op_type(&self) -> OperandType {
 		OperandType::new(self.length, self.is_signed)
 	}
+	pub fn iter(&self) -> impl Iterator<Item = State> + '_ {
+		(0..self.len()).map(move |i| self.get(i).unwrap())
+	}
 }
 
 impl fmt::Display for BitVector {
@@ -230,7 +233,7 @@ impl fmt::Display for BitVector {
 }
 impl fmt::Debug for BitVector {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.to_str())
+		write!(f, "{}{}", if self.is_signed { "s" } else { "" }, self.to_str())
 	}
 }
 

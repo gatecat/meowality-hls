@@ -15,7 +15,7 @@ impl OperandType {
 		OperandType { width, is_signed: true }
 	}
 	pub const fn unsigned(width: usize) -> OperandType {
-		OperandType { width, is_signed: true }
+		OperandType { width, is_signed: false }
 	}
 	pub const fn extra_bit(a: OperandType, b: OperandType) -> usize {
 		if a.is_signed != b.is_signed {1} else {0}
@@ -97,8 +97,17 @@ impl BasicOp {
 					result.set(i, a ^ b ^ carry);
 					carry = (a & b) | (a & carry) | (b & carry);	
 				}
-
-			}
+			},
+			BwAnd => for i in 0..result.len() { result.set(i, operands[0].get_ext(i) & operands[1].get_ext(i)); },
+			BwOr => for i in 0..result.len() { result.set(i, operands[0].get_ext(i) | operands[1].get_ext(i)); },
+			BwXor => for i in 0..result.len() { result.set(i, operands[0].get_ext(i) ^ operands[1].get_ext(i)); },
+			BwNot => for i in 0..result.len() { result.set(i, !operands[0].get_ext(i)); },
+			LogAnd => result = BwAnd.apply(&[LogCast.apply(&[operands[0].clone()]), LogCast.apply(&[operands[1].clone()])]),
+			LogOr => result = BwOr.apply(&[LogCast.apply(&[operands[0].clone()]), LogCast.apply(&[operands[1].clone()])]),
+			LogNot => result = BwNot.apply(&[LogCast.apply(&[operands[0].clone()])]),
+			LogCast => {
+				result.set(0, if operands[0].iter().any(|b| b == State::S1) { State::S1 } else { State::S0 });
+			},
 			_ => unimplemented!()
 		}
 		result
@@ -112,5 +121,21 @@ mod test {
 	fn add() {
 		assert_eq!(BasicOp::Add.apply(&[BitVector::from_u64(42, 8), BitVector::from_u64(69, 8)]), BitVector::from_u64(111, 9));
 		assert_eq!(BasicOp::Add.apply(&[BitVector::from_u64(42, 8), BitVector::from_i64(-1, 8)]), BitVector::from_i64(41, 10));
+	}
+	#[test]
+	fn bitwise() {
+		assert_eq!(BasicOp::BwAnd.apply(&[BitVector::from_u64(0b11000110, 8), BitVector::from_u64(0b101, 3)]), BitVector::from_u64(0b100, 8));
+		assert_eq!(BasicOp::BwOr.apply(&[BitVector::from_u64(0b11000110, 8), BitVector::from_u64(0b101, 3)]), BitVector::from_u64(0b11000111, 8));
+		assert_eq!(BasicOp::BwXor.apply(&[BitVector::from_u64(0b11000110, 8), BitVector::from_u64(0b101, 3)]), BitVector::from_u64(0b11000011, 8));
+		assert_eq!(BasicOp::BwNot.apply(&[BitVector::from_u64(0b11000110, 8)]), BitVector::from_u64(0b00111001, 8));
+	}
+	#[test]
+	fn logical() {
+		assert_eq!(BasicOp::LogCast.apply(&[BitVector::from_u64(0b0000, 4)]), BitVector::from_u64(0b0, 1));
+		assert_eq!(BasicOp::LogCast.apply(&[BitVector::from_u64(0b1010, 4)]), BitVector::from_u64(0b1, 1));
+		assert_eq!(BasicOp::LogOr.apply(&[BitVector::from_u64(0b1010, 4), BitVector::from_u64(0b0, 1)]), BitVector::from_u64(0b1, 1));
+		assert_eq!(BasicOp::LogAnd.apply(&[BitVector::from_u64(0b1010, 4), BitVector::from_u64(0b0, 1)]), BitVector::from_u64(0b0, 1));
+		assert_eq!(BasicOp::LogAnd.apply(&[BitVector::from_u64(0b1010, 4), BitVector::from_u64(0b1, 1)]), BitVector::from_u64(0b1, 1));
+		assert_eq!(BasicOp::LogNot.apply(&[BitVector::from_u64(0b1010, 4)]), BitVector::from_u64(0b0, 1));
 	}
 }
