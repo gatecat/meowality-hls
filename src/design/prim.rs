@@ -1,4 +1,4 @@
-use crate::core::{BasicOp, BitVector, Constant, IdString, StoreIndex};
+use crate::core::{BasicOp, BitVector, Constant, IdString, NamedItem, StoreIndex};
 use crate::design::Node;
 use rustc_hash::FxHashMap;
 
@@ -19,17 +19,35 @@ pub enum Register {
 	Pipeline, // a register inserted to meet timing
 }
 
+// Memory primitives
+pub struct Memory {
+	pub width: usize,
+	pub depth: usize,
+	pub read_ports: usize,
+	pub write_ports: usize,
+	pub is_external: bool,
+	pub init: Vec<BitVector>,
+}
+
 pub enum PrimitiveType {
 	BasicOp(BasicOp),
 	SpecOp(SpecialOperation),
 	Reg(Register),
+	Mem(Memory),
 }
 
 // An instance of a primitive
 pub struct Primitive {
 	pub name: IdString,
+	pub index: StoreIndex<Primitive>,
 	pub typ: PrimitiveType,
 	pub attrs: FxHashMap<IdString, Constant>,
 	pub inputs: FxHashMap<IdString, StoreIndex<Node>>,
 	pub outputs: FxHashMap<IdString, StoreIndex<Node>>,
+}
+
+impl NamedItem for Primitive {
+	fn get_name(&self) -> IdString { self.name }
+	fn set_name(&mut self, name: IdString) { self.name = name; }
+	fn set_index(&mut self, index: StoreIndex<Self>) { self.index = index; }
 }

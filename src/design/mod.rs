@@ -4,3 +4,4 @@ pub mod prim;
 
 pub use context::Context;
 pub use node::Node;
+pub use prim::Primitive;
