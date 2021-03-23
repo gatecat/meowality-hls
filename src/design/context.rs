@@ -1,3 +1,4 @@
+use crate::StoreIndex;
 use crate::core::{IdString, IdStringDb, NamedStore};
 use crate::design::{Node, Primitive};
 
@@ -9,4 +10,5 @@ pub struct Design {
 	pub name: IdString,
 	pub node: NamedStore<Node>,
 	pub prims: NamedStore<Primitive>,
+	pub top_ports: Vec<StoreIndex<Primitive>>,
 }

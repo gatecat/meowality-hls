@@ -1,5 +1,5 @@
-use crate::core::{BasicOp, BitVector, Constant, IdString, NamedItem, StoreIndex};
-use crate::design::Node;
+use crate::core::{BasicOp, BitVector, Constant, IdString, NamedItem, NamedStore, StoreIndex};
+use crate::design::{PortRef, Node};
 use rustc_hash::FxHashMap;
 
 // Special operations for certain hardware-y things
@@ -30,10 +30,33 @@ pub struct Memory {
 }
 
 pub enum PrimitiveType {
+	Constant(BitVector),
 	BasicOp(BasicOp),
 	SpecOp(SpecialOperation),
 	Reg(Register),
 	Mem(Memory),
+	TopPort,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum PortDir {
+	Input,
+	Output,
+}
+
+// A primitive port
+pub struct PrimitivePort {
+	pub name: IdString,
+	pub index: StoreIndex<PrimitivePort>,
+	pub dir: PortDir,
+	pub node: StoreIndex<Node>,
+	pub usr_idx: Option<StoreIndex<PortRef>>,
+}
+
+impl NamedItem for PrimitivePort {
+	fn get_name(&self) -> IdString { self.name }
+	fn set_name(&mut self, name: IdString) { self.name = name; }
+	fn set_index(&mut self, index: StoreIndex<Self>) { self.index = index; }
 }
 
 // An instance of a primitive
@@ -42,8 +65,7 @@ pub struct Primitive {
 	pub index: StoreIndex<Primitive>,
 	pub typ: PrimitiveType,
 	pub attrs: FxHashMap<IdString, Constant>,
-	pub inputs: FxHashMap<IdString, StoreIndex<Node>>,
-	pub outputs: FxHashMap<IdString, StoreIndex<Node>>,
+	pub ports: NamedStore<PrimitivePort>,
 }
 
 impl NamedItem for Primitive {

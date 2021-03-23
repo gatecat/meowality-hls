@@ -1,8 +1,8 @@
 use crate::core::{IdString, ObjectStore, StoreIndex, OperandType, NamedItem};
 
-pub enum PortRef {
-	TopLevel(IdString), // external I/O port
-	Prim(IdString, IdString), // primitive, with port name
+pub struct PortRef {
+	pub prim: IdString,
+	pub port: IdString,
 }
 
 pub struct Node {

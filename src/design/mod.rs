@@ -3,5 +3,5 @@ pub mod node;
 pub mod prim;
 
 pub use context::Context;
-pub use node::Node;
+pub use node::{PortRef, Node};
 pub use prim::Primitive;
