@@ -1,4 +1,4 @@
-use crate::core::{BasicOp, BitVector, Constant, IdString, NamedItem, NamedStore, StoreIndex};
+use crate::core::{BasicOp, BitVector, Constant, IdString, NamedItem, NamedStore, NullableIndex, StoreIndex};
 use crate::design::{PortRef, Node};
 use rustc_hash::FxHashMap;
 
@@ -47,29 +47,62 @@ pub enum PortDir {
 // A primitive port
 pub struct PrimitivePort {
 	pub name: IdString,
-	pub index: StoreIndex<PrimitivePort>,
+	pub index: NullableIndex<Self>,
 	pub dir: PortDir,
-	pub node: StoreIndex<Node>,
-	pub usr_idx: Option<StoreIndex<PortRef>>,
+	pub node: NullableIndex<Node>,
+	pub usr_idx: NullableIndex<PortRef>,
+}
+
+impl PrimitivePort {
+	pub fn input(name: IdString, node: StoreIndex<Node>, usr_idx: StoreIndex<PortRef>) -> PrimitivePort {
+		PrimitivePort {
+			name: name,
+			index: NullableIndex::none(),
+			dir: PortDir::Input,
+			node: NullableIndex::some(node),
+			usr_idx: NullableIndex::some(usr_idx),
+		}
+	}
+	pub fn output(name: IdString, node: StoreIndex<Node>) -> PrimitivePort {
+		PrimitivePort {
+			name: name,
+			index: NullableIndex::none(),
+			dir: PortDir::Output,
+			node: NullableIndex::some(node),
+			usr_idx: NullableIndex::none(),
+		}
+	}
 }
 
 impl NamedItem for PrimitivePort {
 	fn get_name(&self) -> IdString { self.name }
 	fn set_name(&mut self, name: IdString) { self.name = name; }
-	fn set_index(&mut self, index: StoreIndex<Self>) { self.index = index; }
+	fn set_index(&mut self, index: StoreIndex<Self>) { self.index = NullableIndex::some(index); }
 }
 
 // An instance of a primitive
 pub struct Primitive {
 	pub name: IdString,
-	pub index: StoreIndex<Primitive>,
+	pub index: NullableIndex<Self>,
 	pub typ: PrimitiveType,
 	pub attrs: FxHashMap<IdString, Constant>,
 	pub ports: NamedStore<PrimitivePort>,
 }
 
+impl Primitive {
+	pub fn new(name: IdString, typ: PrimitiveType) -> Primitive {
+		Primitive {
+			name: name,
+			index: NullableIndex::none(),
+			typ: typ,
+			attrs: FxHashMap::default(),
+			ports: NamedStore::new(),
+		}
+	}
+}
+
 impl NamedItem for Primitive {
 	fn get_name(&self) -> IdString { self.name }
 	fn set_name(&mut self, name: IdString) { self.name = name; }
-	fn set_index(&mut self, index: StoreIndex<Self>) { self.index = index; }
+	fn set_index(&mut self, index: StoreIndex<Self>) { self.index = NullableIndex::some(index); }
 }
