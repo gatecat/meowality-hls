@@ -72,6 +72,12 @@ impl PrimitivePort {
 			usr_idx: NullableIndex::none(),
 		}
 	}
+	pub fn is_output(&self) -> bool {
+		match self.dir {
+			PortDir::Output => true,
+			_ => false,
+		}
+	}
 }
 
 impl NamedItem for PrimitivePort {
@@ -98,6 +104,10 @@ impl Primitive {
 			attrs: FxHashMap::default(),
 			ports: NamedStore::new(),
 		}
+	}
+	pub fn add_input(&mut self, name: IdString, node: &mut Node) -> Result<StoreIndex<PrimitivePort>, String> {
+		let usr_idx = node.users.add(PortRef { prim: self.index.unwrap(), port: name });
+		self.ports.add(PrimitivePort::input(name, node.index.unwrap(), usr_idx))
 	}
 }
 

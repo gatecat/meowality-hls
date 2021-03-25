@@ -4,4 +4,4 @@ pub mod prim;
 
 pub use context::Context;
 pub use node::{PortRef, Node};
-pub use prim::{PrimitiveType, Primitive};
+pub use prim::{PrimitiveType, PrimitivePort, Primitive};

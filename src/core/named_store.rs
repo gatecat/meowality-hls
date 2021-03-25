@@ -72,11 +72,17 @@ impl <T: NamedItem> NamedStore<T> {
 	pub fn remove(&mut self, idx: StoreIndex<T>) {
 		self.objects.remove(idx);
 	}
+	pub fn remove_named(&mut self, name: IdString) {
+		self.objects.remove(*self.names.get(&name).unwrap());
+	}
 	pub fn count(&self) -> usize {
 		self.objects.count()
 	}
 	pub fn size(&self) -> usize {
 		self.objects.size()
+	}
+	pub fn iter<'a>(&'a self) -> impl Iterator<Item=(StoreIndex<T>, &'a T)> {
+		self.objects.iter()
 	}
 }
 

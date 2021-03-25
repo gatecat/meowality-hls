@@ -48,4 +48,11 @@ constids! {
 	input,
 	output,
 	static_cast,
+	// Primitive ports
+	A,
+	B,
+	C,
+	D,
+	SEL,
+	Q,
 }
