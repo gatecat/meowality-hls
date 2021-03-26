@@ -1,5 +1,5 @@
 use std::fmt;
-use crate::core::{BitVector, IdString};
+use crate::core::{IdString};
 use crate::ast::base::*;
 use crate::ast::{Expression, Statement};
 

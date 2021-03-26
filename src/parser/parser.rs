@@ -1,4 +1,3 @@
-use rustc_hash::FxHashMap;
 use crate::ast::*;
 use crate::core::{constids, IdString, IdStringDb};
 use crate::parser::parser_state::*;
@@ -558,7 +557,7 @@ pub mod test {
 	#[test]
 	fn prim_types() -> Result<(), ParserError> {
 		use DataTypes::*;
-		let (mut ids, mut p, r) = setup("char; unsigned<33>; unsigned short int; signed;")?;
+		let (mut ids, mut p, _r) = setup("char; unsigned<33>; unsigned short int; signed;")?;
 		let exp_types = &[(8, true), (33, false), (16, false), (32, true)];
 		for (width, is_signed) in exp_types {
 			let dt = p.parse_datatype(&mut ids, &ScopeLevel { parent: None, entry: &NullEntry })?.unwrap();
@@ -576,7 +575,7 @@ pub mod test {
 
 	#[test]
 	fn attrs() -> Result<(), ParserError> {
-		let (mut ids, mut p, r) = setup("[[attr=11]] [[another_attr]]")?;
+		let (mut ids, mut p, _r) = setup("[[attr=11]] [[another_attr]]")?;
 		assert_eq!(p.parse_attrs(&mut ids, &ScopeLevel { parent: None, entry: &NullEntry })?, AttributeList(vec![
 			Attribute { name: ids.id("attr"), value: Expression::from_u64(11, 64) },
 			Attribute { name: ids.id("another_attr"), value: Expression::new(ExprType::Null) }
@@ -587,7 +586,7 @@ pub mod test {
 	#[test]
 	fn complex_types() -> Result<(), ParserError> {
 		use DataTypes::*;
-		let (mut ids, mut p, r) = setup("typename our_struct<unsigned<19>, our_const>")?;
+		let (mut ids, mut p, _r) = setup("typename our_struct<unsigned<19>, our_const>")?;
 		let dt = p.parse_datatype(&mut ids, &ScopeLevel { parent: None, entry: &NullEntry })?.unwrap();
 		match dt.typ {
 			User(ut) => {
@@ -603,7 +602,7 @@ pub mod test {
 	#[test]
 	fn basic_expr() -> Result<(), ParserError> {
 		use ExprType::*;
-		let (mut ids, mut p, r) = setup("4+5*(6+-7)")?;
+		let (mut ids, mut p, _r) = setup("4+5*(6+-7)")?;
 		assert_eq!(p.parse_expression(&mut ids, &ScopeLevel { parent: None, entry: &NullEntry }, false)?, 
 			Expression::new(Op(Operator::Add, vec![
 				Expression::from_u64(4, 64),

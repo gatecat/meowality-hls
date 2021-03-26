@@ -9,7 +9,7 @@ pub struct PortRef {
 pub struct Node {
 	pub name: IdString,
 	pub index: NullableIndex<Self>,
-	pub ty: OperandType,
+	pub typ: OperandType,
 	pub has_ready: bool,
 	pub has_valid: bool,
 	pub delay: Option<u64>,
@@ -19,11 +19,11 @@ pub struct Node {
 }
 
 impl Node {
-	pub fn new(name: IdString, ty: OperandType, driver: PortRef) -> Node {
+	pub fn new(name: IdString, typ: OperandType, driver: PortRef) -> Node {
 		Node {
 			name: name,
 			index: NullableIndex::none(),
-			ty: ty,
+			typ: typ,
 			has_ready: false, // TODO
 			has_valid: false,
 			delay: None,

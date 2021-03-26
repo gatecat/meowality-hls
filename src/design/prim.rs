@@ -3,6 +3,7 @@ use crate::design::{PortRef, Node};
 use rustc_hash::FxHashMap;
 
 // Special operations for certain hardware-y things
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SpecialOperation {
 	Mux(usize), // for conditionals, array reads, etc
 	SetIfEq{pattern: BitVector}, // for array writes; replace value if index matches
@@ -13,6 +14,7 @@ pub enum SpecialOperation {
 }
 
 // The various kinds of registers we use
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Register {
 	Delay(usize), // a deliberately created delay of K cycles
 	Storage, // storing values between runs
@@ -20,6 +22,7 @@ pub enum Register {
 }
 
 // Memory primitives
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Memory {
 	pub width: usize,
 	pub depth: usize,
@@ -29,6 +32,7 @@ pub struct Memory {
 	pub init: Vec<BitVector>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PrimitiveType {
 	Constant(BitVector),
 	BasicOp(BasicOp),

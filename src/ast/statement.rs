@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::core::IdString;
 use crate::ast::base::*;
-use crate::ast::{DataType, Expression, StructureDef, TemplateArg, TemplateArgType};
+use crate::ast::{DataType, Expression, StructureDef, TemplateArg};
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct VariableDecl {
