@@ -6,6 +6,7 @@ pub mod ast;
 pub mod core;
 pub mod design;
 pub mod parser;
+pub mod codegen;
 
 use std::io::Read;
 use std::fs::File;
