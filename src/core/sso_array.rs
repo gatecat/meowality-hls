@@ -1,7 +1,8 @@
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 // This is an array type that preallocates Nsmall entries without needing heap; larger values go onto the heap
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub enum SSOArray <T: Clone+Default+Copy, const N_SMALL: usize> {
 	Small(usize, [T; N_SMALL]),
 	Large(Vec<T>),
@@ -69,6 +70,16 @@ impl <T: Clone + Default + Copy, const N_SMALL: usize> DerefMut for SSOArray<T, 
 		}
 	}
 }
+
+impl <T: Clone + Default + Copy + fmt::Debug, const N_SMALL: usize> fmt::Debug for SSOArray<T, N_SMALL> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "[")?;
+		for item in &self[..] {
+			write!(f, "{:?}, ", item)?;
+		}
+		write!(f, "]")?;
+		Ok(())
+	}}
 
 #[cfg(test)]
 mod test {

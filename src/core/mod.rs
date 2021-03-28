@@ -19,3 +19,4 @@ pub use named_store::{NamedItem, NamedStore};
 pub use nullable::{Nullable, NullValue};
 pub use object_store::{StoreIndex, NullableIndex, ObjectStore};
 pub use operation::{BasicOp, OperandType};
+pub use sso_array::SSOArray;

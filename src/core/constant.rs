@@ -4,7 +4,7 @@ use std::cmp::max;
 use std::fmt;
 
 // The four states that planar cares about
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum State {
 	S0,
 	S1,
@@ -108,7 +108,7 @@ impl Not for State {
 //  0   |  1  |  S1
 //  1   |  0  |  Sx
 //  1   |  1  |  Sz
-#[derive(Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default)]
 pub struct FourValChunk {
 	pub value: u64,
 	pub mask: u64,
@@ -132,7 +132,7 @@ impl FourValChunk {
 
 // Our BitVector type is implemented as a list of the above chunks
 // TODO: do we need to store signedness, too?
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Hash, Clone)]
 pub struct BitVector {
 	pub length: usize,
 	pub is_signed: bool,
