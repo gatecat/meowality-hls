@@ -1,3 +1,6 @@
+use crate::ast::Function;
+use rustc_hash::FxHashMap;
+use crate::core::IdString;
 use crate::core::{BitVector, OperandType};
 use crate::codegen::Identifier;
 
@@ -16,11 +19,24 @@ pub struct ResolvedKey {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum ResolvedType {
+pub enum ResolvedTypes {
 	Void,
 	Integer(OperandType),
 	AutoInt,
 	Reference(Box<ResolvedType>),
 	Array(Box<ResolvedType>, usize),
 	Struct(ResolvedKey),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct ResolvedType {
+	pub typ: ResolvedTypes,
+	pub is_const: bool,
+	pub is_static: bool,
+}
+
+// A derived structure
+pub struct DerivedStruct {
+	pub members: FxHashMap<IdString, ResolvedType>,
+	pub functions: Vec<Function>, 
 }

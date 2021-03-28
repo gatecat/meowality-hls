@@ -10,7 +10,7 @@ pub struct State {
 	pub vars: ObjectStore<Variable>,
 	// A list of all derived (post-template-substitution) functions and structures
 	pub funcs: FxHashMap<ResolvedKey, Function>,
-	pub structs: FxHashMap<ResolvedKey, StructureDef>,
+	pub structs: FxHashMap<ResolvedKey, DerivedStruct>,
 }
 
 // Codegen state for a specific scope
