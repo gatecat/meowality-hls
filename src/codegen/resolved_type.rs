@@ -40,3 +40,12 @@ pub struct DerivedStruct {
 	pub members: FxHashMap<IdString, ResolvedType>,
 	pub functions: Vec<Function>, 
 }
+
+impl DerivedStruct {
+	pub fn new() -> DerivedStruct {
+		DerivedStruct {
+			members: FxHashMap::default(),
+			functions: Vec::new(),
+		}
+	}
+}

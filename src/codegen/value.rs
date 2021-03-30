@@ -1,4 +1,5 @@
-use crate::ast::{DataType, StructureDef, Function};
+use crate::codegen::{State, ResolvedTypes, ResolvedKey};
+use crate::ast::{DataType, Function};
 use crate::core::{BitVector, StoreIndex, IdString};
 use crate::design::Node;
 use rustc_hash::FxHashMap;
@@ -12,7 +13,7 @@ pub struct Variable {
 
 // The contents of a structure
 pub struct StructureValue {
-	pub typ: StoreIndex<StructureDef>,
+	pub typ: ResolvedKey,
 	pub values: FxHashMap<IdString, Value>,
 }
 
@@ -25,4 +26,24 @@ pub enum Value {
 	Array(Vec<Value>), // an array, stored as a list of values
 	Func(StoreIndex<Function>), // a function 'pointer'
 	Ref(StoreIndex<Variable>), // a reference to another variable (TODO: what are we actually indexing) 
+}
+
+impl Value {
+	// Create an outline value from a resolved type (with leaf values filled with Void)
+	pub fn from_type(st: &State, ty: &ResolvedTypes) -> Value {
+		use Value::*;
+		match ty {
+			ResolvedTypes::Integer(it) => Constant(BitVector::undefined(it.width, it.is_signed)),
+			ResolvedTypes::Struct(key) => {
+				let struct_data = st.structs.get(key).unwrap();
+				Structure(StructureValue {
+					typ: key.clone(),
+					values: struct_data.members.iter().map(|(k, t)| (*k, Self::from_type(st, &t.typ))).collect(),
+				})
+			}
+			ResolvedTypes::Array(base, count) => Array((0..*count).map(|_| Self::from_type(st, &base.typ)).collect()),
+			ResolvedTypes::Reference(_) => unimplemented!(), // special_case
+			_ => Void,
+		}
+	}
 }

@@ -5,4 +5,5 @@ pub mod ident;
 
 pub use value::{Value, Variable};
 pub use ident::Identifier;
-pub use resolved_type::{ResolvedKey, ResolvedType, DerivedStruct};
+pub use resolved_type::{ResolvedKey, ResolvedType, ResolvedTypes, DerivedStruct};
+pub use state::{State, GenScope};

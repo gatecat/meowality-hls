@@ -128,6 +128,7 @@ impl FourValChunk {
 		if val { self.value |= 1 << idx; } else { self.value &= !(1 << idx); }
 		if mask { self.mask |= 1 << idx; } else { self.mask &= !(1 << idx); }
 	}
+	pub const ALL_UNDEF: Self = FourValChunk { value: 0, mask: 0xFFFFFFFFFFFFFFFF };
 }
 
 // Our BitVector type is implemented as a list of the above chunks
@@ -145,6 +146,13 @@ impl BitVector {
 			length: len,
 			is_signed: is_signed,
 			chunks: vec![ FourValChunk::default(); max(1, (len + 63) / 64)]
+		}
+	}
+	pub fn undefined(len: usize, is_signed: bool) -> BitVector {
+		BitVector {
+			length: len,
+			is_signed: is_signed,
+			chunks: vec![ FourValChunk::ALL_UNDEF; max(1, (len + 63) / 64)]
 		}
 	}
 	pub fn from_u64(val: u64, len: usize) -> BitVector {
