@@ -71,6 +71,29 @@ impl Value {
 			}?
 		})
 	}
+	// Replace a value, following a path
+	pub fn set(&mut self, path: &[ValuePathItem], val: Value) {
+		if path.len() == 0 {
+			*self = val;
+		} else {
+			match &path[0] {
+				ValuePathItem::Index(idx) => {
+					if let Value::Array(vals) = self {
+						vals[*idx].set(&path[1..], val);
+					} else {
+						panic!("expected array");
+					}
+				},
+				ValuePathItem::Member(m) => {
+					if let Value::Structure(sv) = self {
+						sv.values.get_mut(m).unwrap().set(&path[1..], val);
+					} else {
+						panic!("expected structure");
+					}
+				}
+			}
+		}
+	}
 }
 
 impl fmt::Debug for Value {
@@ -84,4 +107,11 @@ impl fmt::Debug for Value {
 		}
 		Ok(())
 	}
+}
+
+// This enables us to point to deep within a value
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub enum ValuePathItem {
+	Index(usize),
+	Member(IdString),
 }
