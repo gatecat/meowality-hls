@@ -75,6 +75,45 @@ impl fmt::Debug for ResolvedType {
 	}
 }
 
+impl ResolvedType {
+	pub fn merge(&self, other: &ResolvedType) -> Option<ResolvedType> {
+		use ResolvedTypes::*;
+		Some(ResolvedType {
+			is_const: (self.is_const | other.is_const),
+			is_static: (self.is_static | other.is_static),
+			typ: match &self.typ {
+				Void => Some(other.typ.clone()),
+				Integer(ot1) => match other.typ {
+					Integer(ot2) => Some(Integer(OperandType::merge(*ot1, ot2))),
+					AutoInt => Some(AutoInt),
+					Void => Some(Integer(*ot1)),
+					_ => None,
+				}
+				AutoInt => match other.typ {
+					Integer(_) | AutoInt | Void => Some(AutoInt),
+					_ => None,
+				},
+				Reference(rt1) => match &other.typ {
+					Reference(rt2) => Some(Reference(Box::new(rt1.merge(&rt2)?))),
+					_ => Some(Reference(Box::new(rt1.merge(&other)?))),
+				},
+				Array(base, len) => match &other.typ {
+					Void => Some(Array(base.clone(), *len)),
+					Array(base2, len2) => Some(Array(Box::new(base.merge(base2)?), std::cmp::max(*len, *len2))),
+					_ => None,
+				},
+				Struct(k) => {
+					match &other.typ {
+						Void => Some(Struct(k.clone())),
+						Struct(k2) => if k == k2 { Some(Struct(k.clone())) } else { None },
+						_ => None,
+					}
+				},
+			}?
+		})
+	}
+}
+
 // A derived structure
 pub struct DerivedStruct {
 	pub members: FxHashMap<IdString, ResolvedType>,

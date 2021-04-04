@@ -2,6 +2,8 @@ use crate::ast::{Function};
 use crate::core::{StoreIndex, IdString, ObjectStore, NullableIndex};
 use rustc_hash::FxHashMap;
 
+use crate::design::Design;
+
 use crate::codegen::*;
 
 // Codegen state for the elaboration of a module
@@ -11,6 +13,8 @@ pub struct State {
 	// A list of all derived (post-template-substitution) functions and structures
 	pub funcs: FxHashMap<ResolvedKey, Function>,
 	pub structs: FxHashMap<ResolvedKey, DerivedStruct>,
+	// The elaborated design
+	pub des: Design,
 }
 
 // Codegen state for a specific scope

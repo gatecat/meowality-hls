@@ -1,6 +1,6 @@
 use std::fmt;
-use crate::codegen::{State, ResolvedTypes, ResolvedKey};
-use crate::ast::{DataType, Function};
+use crate::codegen::{State, ResolvedType, ResolvedTypes, ResolvedKey};
+use crate::ast::{Function};
 use crate::core::{BitVector, StoreIndex, IdString};
 use crate::design::Node;
 use rustc_hash::FxHashMap;
@@ -8,13 +8,13 @@ use rustc_hash::FxHashMap;
 // All variables are tracked this way
 pub struct Variable {
 	pub name: IdString,
-	pub typ: DataType,
+	pub typ: ResolvedType,
 	pub value: Value,
 }
 
 // The contents of a structure
 pub struct StructureValue {
-	pub typ: ResolvedKey	,
+	pub typ: ResolvedKey,
 	pub values: FxHashMap<IdString, Value>,
 }
 
@@ -46,7 +46,31 @@ impl Value {
 			ResolvedTypes::Reference(_) => unimplemented!(), // special_case
 			_ => Void,
 		}
-	}	
+	}
+	// Gets the type of a value
+	pub fn to_type(&self, st: &State) -> Option<ResolvedType> {
+		Some(ResolvedType {
+			is_const: true,
+			is_static: false,
+			typ: match self {
+				Value::Void => Some(ResolvedTypes::Void),
+				Value::Constant(bv) => Some(ResolvedTypes::Integer(bv.op_type())),
+				Value::Node(n) => Some(ResolvedTypes::Integer(st.des.nodes.get(*n).typ)),
+				Value::Structure(sv) => Some(ResolvedTypes::Struct(sv.typ.clone())),	
+				Value::Array(vals) => {
+					let mut typ = ResolvedType { is_const: true, is_static: false, typ: ResolvedTypes::Void };
+					for val in vals.iter() {
+						typ = typ.merge(&val.to_type(st)?)?;
+					}
+					Some(typ.typ)
+				},
+				Value::Ref(v) => {
+					Some(ResolvedTypes::Reference(Box::new(st.vars.get(*v).typ.clone())))
+				}
+				_ => unimplemented!(),
+			}?
+		})
+	}
 }
 
 impl fmt::Debug for Value {
