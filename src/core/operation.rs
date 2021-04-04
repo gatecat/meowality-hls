@@ -1,7 +1,8 @@
 use crate::core::{State, BitVector};
+use std::fmt;
 
 // Operand type
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct OperandType {
 	pub width: usize,
 	pub is_signed: bool,
@@ -33,6 +34,17 @@ impl OperandType {
 		}
 	}
 	pub const BOOL : OperandType = OperandType::unsigned(1);
+}
+
+impl fmt::Debug for OperandType {
+	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+		if self.is_signed {
+			write!(fmt, "signed<{}>", self.width)?;
+		} else {
+			write!(fmt, "unsigned<{}>", self.width)?;
+		}
+		Ok(())
+	}
 }
 
 // The standard C type operations

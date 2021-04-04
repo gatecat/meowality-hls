@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::codegen::{State, ResolvedTypes, ResolvedKey};
 use crate::ast::{DataType, Function};
 use crate::core::{BitVector, StoreIndex, IdString};
@@ -13,7 +14,7 @@ pub struct Variable {
 
 // The contents of a structure
 pub struct StructureValue {
-	pub typ: ResolvedKey,
+	pub typ: ResolvedKey	,
 	pub values: FxHashMap<IdString, Value>,
 }
 
@@ -45,5 +46,18 @@ impl Value {
 			ResolvedTypes::Reference(_) => unimplemented!(), // special_case
 			_ => Void,
 		}
+	}	
+}
+
+impl fmt::Debug for Value {
+	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+		use Value::*;
+		match self {
+			Void => write!(fmt, "<void>")?,
+			Constant(v) => write!(fmt, "{:?}", v)?,
+			Node(n) => write!(fmt, "{:?}", n)?,
+			_ => unimplemented!(),
+		}
+		Ok(())
 	}
 }

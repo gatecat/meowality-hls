@@ -63,7 +63,7 @@ impl<T> Ord for StoreIndex<T> {
 
 impl <T> fmt::Debug for StoreIndex<T> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "StoreIndex<{}>({})", std::any::type_name::<T>(), self.idx)
+		write!(f, "`{}|{}`", std::any::type_name::<T>(), self.idx)
 	}
 }
 
