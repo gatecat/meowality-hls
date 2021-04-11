@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 // Special operations for certain hardware-y things
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SpecialOperation {
-	Mux(usize), // for conditionals, array reads, etc
+	Mux(usize), // for array reads, etc
 	SetIfEq{pattern: BitVector}, // for array writes; replace value if index matches
 	SliceGetFix{offset: usize, width: usize}, // compile time bitslice extraction 
 	SliceGetVar{step: usize, width: usize}, // run time bitslice extraction
@@ -37,6 +37,7 @@ pub enum PrimitiveType {
 	Constant(BitVector),
 	BasicOp(BasicOp),
 	SpecOp(SpecialOperation),
+	Cond{ inv: BitVector }, // conditional tree entry, width of mask decides condition input count and 1 in mask indicates inversion
 	Reg(Register),
 	Mem(Memory),
 	TopPort,
@@ -108,10 +109,6 @@ impl Primitive {
 			attrs: FxHashMap::default(),
 			ports: NamedStore::new(),
 		}
-	}
-	pub fn add_input(&mut self, name: IdString, node: &mut Node) -> Result<StoreIndex<PrimitivePort>, String> {
-		let usr_idx = node.users.add(PortRef { prim: self.index.unwrap(), port: name });
-		self.ports.add(PrimitivePort::input(name, node.index.unwrap(), usr_idx))
 	}
 }
 

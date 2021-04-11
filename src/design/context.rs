@@ -37,6 +37,10 @@ impl Design {
 		self.prims.get_mut(driver).ports.add(PrimitivePort::output(driver_port, node_idx))?;
 		Ok(node_idx)
 	}
+	pub fn add_prim_input(&mut self, prim: StoreIndex<Primitive>, name: IdString, node: StoreIndex<Node>) -> Result<StoreIndex<PrimitivePort>, String> {
+		let usr_idx = self.nodes.get_mut(node).users.add(PortRef { prim: prim, port: name });
+		self.prims.get_mut(prim).ports.add(PrimitivePort::input(name, node, usr_idx))
+	}
 	pub fn add_const(&mut self, ids: &mut IdStringDb, value: BitVector) -> StoreIndex<Node> {
 		let value_ty = value.op_type();
 		// Create a constant primitive

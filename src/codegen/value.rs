@@ -1,5 +1,5 @@
 use std::fmt;
-use crate::codegen::{State, ResolvedType, ResolvedTypes, ResolvedKey};
+use crate::codegen::{GenState, ResolvedType, ResolvedTypes, ResolvedKey};
 use crate::ast::{Function};
 use crate::core::{BitVector, StoreIndex, IdString};
 use crate::design::Node;
@@ -31,7 +31,7 @@ pub enum Value {
 
 impl Value {
 	// Create an outline value from a resolved type (with leaf values filled with Void)
-	pub fn from_type(st: &State, ty: &ResolvedTypes) -> Value {
+	pub fn from_type(st: &GenState, ty: &ResolvedTypes) -> Value {
 		use Value::*;
 		match ty {
 			ResolvedTypes::Integer(it) => Constant(BitVector::undefined(it.width, it.is_signed)),
@@ -48,7 +48,7 @@ impl Value {
 		}
 	}
 	// Gets the type of a value
-	pub fn to_type(&self, st: &State) -> Option<ResolvedType> {
+	pub fn to_type(&self, st: &GenState) -> Option<ResolvedType> {
 		Some(ResolvedType {
 			is_const: true,
 			is_static: false,
