@@ -13,12 +13,14 @@ pub struct Variable {
 }
 
 // The contents of a structure
+#[derive(Clone, Eq, PartialEq)]
 pub struct StructureValue {
 	pub typ: ResolvedKey,
 	pub values: FxHashMap<IdString, Value>,
 }
 
 // Lots of different things can be 'values' in our codegen IL
+#[derive(Clone, Eq, PartialEq)]
 pub enum Value {
 	Void, // void type, probably shouldn't exist
 	Constant(BitVector), // a resolved constant value
@@ -28,8 +30,20 @@ pub enum Value {
 	Func(StoreIndex<Function>), // a function 'pointer'
 	Ref(StoreIndex<Variable>), // a reference to another variable (TODO: what are we actually indexing) 
 }
-
 impl Value {
+	pub fn from_node(node: StoreIndex<Node>) -> Value {
+		Value::Node(node)
+	}
+	pub fn from_const(constant: BitVector) -> Value {
+		Value::Constant(constant)
+	}
+
+	pub fn is_scalar(&self) -> bool {
+		match self {
+			Value::Constant(_) | Value::Node(_) => true,
+			_ => false,
+		}
+	}
 	// Create an outline value from a resolved type (with leaf values filled with Void)
 	pub fn from_type(st: &GenState, ty: &ResolvedTypes) -> Value {
 		use Value::*;
@@ -87,6 +101,29 @@ impl Value {
 				ValuePathItem::Member(m) => {
 					if let Value::Structure(sv) = self {
 						sv.values.get_mut(m).unwrap().set(&path[1..], val);
+					} else {
+						panic!("expected structure");
+					}
+				}
+			}
+		}
+	}
+	// Get a value following a path
+	pub fn get(&self, path: &[ValuePathItem]) -> &Value {
+		if path.len() == 0 {
+			self
+		} else {
+			match &path[0] {
+				ValuePathItem::Index(idx) => {
+					if let Value::Array(vals) = self {
+						vals[*idx].get(&path[1..])
+					} else {
+						panic!("expected array");
+					}
+				},
+				ValuePathItem::Member(m) => {
+					if let Value::Structure(sv) = self {
+						sv.values.get(m).unwrap().get(&path[1..])
 					} else {
 						panic!("expected structure");
 					}

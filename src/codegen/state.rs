@@ -28,7 +28,14 @@ impl <'a> GenState<'a> {
 		let new_name = format!("{}${}$", self.ids.get_str(base), self.auto_idx);
 		self.ids.id(&new_name)
 	}
-	fn apply_conditionals(&mut self, base_name: IdString, old_value: StoreIndex<Node>, new_value: StoreIndex<Node>) -> StoreIndex<Node> {
+	fn get_node(&mut self, value: Value) -> StoreIndex<Node> {
+		match value {
+			Value::Node(n) => n,
+			Value::Constant(c) => self.des.add_const(self.ids, c),
+			_ => unreachable!(),
+		}
+	}
+	fn apply_conditionals(&mut self, base_name: IdString, old_value: Value, new_value: Value) -> Value {
 		if self.conds.is_empty() {
 			return new_value;
 		}
@@ -38,15 +45,45 @@ impl <'a> GenState<'a> {
 		}
 		let prim_name = self.next_name(base_name);
 		let prim = self.des.add_prim(prim_name, PrimitiveType::Cond { inv: cond_inv}).unwrap();
-		self.des.add_prim_input(prim, constids::A, old_value).unwrap();
-		self.des.add_prim_input(prim, constids::B, new_value).unwrap();
+		let old_node = self.get_node(old_value);
+		let new_node = self.get_node(new_value);
+		self.des.add_prim_input(prim, constids::A, old_node).unwrap();
+		self.des.add_prim_input(prim, constids::B, new_node).unwrap();
 		for (i, (node, _)) in self.conds.iter().enumerate() {
 			let port_name = self.ids.id(&format!("S{}", i));
 			self.des.add_prim_input(prim, port_name, *node).unwrap();
 		}
-		let typ = self.des.nodes.get(new_value).typ;
+		let typ = self.des.nodes.get(new_node).typ;
 		let node_name = self.next_name(base_name);
-		self.des.add_node(node_name, typ, prim, constids::Q).unwrap()
+		Value::from_node(self.des.add_node(node_name, typ, prim, constids::Q).unwrap())
+	}
+	fn assign_variable(&mut self, var: StoreIndex<Variable>, path: &[ValuePathItem], new_value: &Value) {
+		let curr_value = self.vars.get(var).value.get(path).clone();
+		if curr_value.is_scalar() {
+			// at the end of the line, actually assign the value
+			assert!(new_value.is_scalar());
+			let value_name = self.vars.get(var).name;
+			let applied_value = self.apply_conditionals(value_name, curr_value.clone(), new_value.clone());
+			self.vars.get_mut(var).value.set(path, applied_value);
+		} else {
+			match new_value {
+				Value::Array(values) => {
+					for (i, val) in values.iter().enumerate() {
+						let mut next_path = Vec::from(path);
+						next_path.push(ValuePathItem::Index(i));
+						self.assign_variable(var, &next_path, val);
+					}
+				},
+				Value::Structure(sv) => {
+					for (key, val) in sv.values.iter() {
+						let mut next_path = Vec::from(path);
+						next_path.push(ValuePathItem::Member(*key));
+						self.assign_variable(var, &next_path, val);
+					}
+				}
+				_ => unreachable!(),
+			}
+		}
 	}
 }
 
