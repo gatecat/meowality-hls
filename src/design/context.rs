@@ -1,4 +1,5 @@
 use crate::StoreIndex;
+use crate::ast::SrcInfo;
 use crate::core::{constids, BitVector, IdString, IdStringDb, NamedStore, OperandType};
 use crate::design::{Node, PortRef, Primitive, PrimitivePort, PrimitiveType};
 
@@ -29,11 +30,11 @@ impl Design {
 		self.auto_idx += 1;
 		id
 	}
-	pub fn add_prim(&mut self, name: IdString, ty: PrimitiveType) -> Result<StoreIndex<Primitive>, String> {
-		self.prims.add(Primitive::new(name, ty))
+	pub fn add_prim(&mut self, name: IdString, ty: PrimitiveType, src: SrcInfo) -> Result<StoreIndex<Primitive>, String> {
+		self.prims.add(Primitive::new(name, ty, src))
 	}
-	pub fn add_node(&mut self, name: IdString, ty: OperandType, driver: StoreIndex<Primitive>, driver_port: IdString) -> Result<StoreIndex<Node>, String> {
-		let node_idx = self.nodes.add(Node::new(name, ty, PortRef { prim: driver, port: driver_port }))?;
+	pub fn add_node(&mut self, name: IdString, ty: OperandType, src: SrcInfo, driver: StoreIndex<Primitive>, driver_port: IdString) -> Result<StoreIndex<Node>, String> {
+		let node_idx = self.nodes.add(Node::new(name, ty, PortRef { prim: driver, port: driver_port }, src))?;
 		self.prims.get_mut(driver).ports.add(PrimitivePort::output(driver_port, node_idx))?;
 		Ok(node_idx)
 	}
@@ -41,14 +42,14 @@ impl Design {
 		let usr_idx = self.nodes.get_mut(node).users.add(PortRef { prim: prim, port: name });
 		self.prims.get_mut(prim).ports.add(PrimitivePort::input(name, node, usr_idx))
 	}
-	pub fn add_const(&mut self, ids: &mut IdStringDb, value: BitVector) -> StoreIndex<Node> {
+	pub fn add_const(&mut self, ids: &mut IdStringDb, value: BitVector, src: SrcInfo) -> StoreIndex<Node> {
 		let value_ty = value.op_type();
 		// Create a constant primitive
 		let prim_name = self.auto_id(ids);
-		let prim = self.add_prim(prim_name, PrimitiveType::Constant(value)).unwrap();
+		let prim = self.add_prim(prim_name, PrimitiveType::Constant(value), src).unwrap();
 		// Create a constant node driven by it
 		let node_name = self.auto_id(ids);
-		self.add_node(node_name, value_ty, prim, constids::Q).unwrap()
+		self.add_node(node_name, value_ty, src, prim, constids::Q).unwrap()
 	}
 	pub fn remove_node(&mut self, node: StoreIndex<Node>) {
 		// Before removing a node all users must be removed first
@@ -112,7 +113,7 @@ mod test {
 		let mut ids = IdStringDb::new();
 		constids::do_ids_init(&mut ids);
 		let mut des = Design::new(ids.id("top"));
-		let const_node = des.add_const(&mut ids, BitVector::from_u64(0xDEADBEEF, 32));
+		let const_node = des.add_const(&mut ids, BitVector::from_u64(0xDEADBEEF, 32), SrcInfo::default());
 		assert_eq!(des.nodes.get(const_node).typ, OperandType::unsigned(32));
 		assert_eq!(des.prims.get(des.nodes.get(const_node).driver.prim).typ, PrimitiveType::Constant(BitVector::from_u64(0xDEADBEEF, 32)));
 		Ok(())
@@ -122,7 +123,7 @@ mod test {
 		let mut ids = IdStringDb::new();
 		constids::do_ids_init(&mut ids);
 		let mut des = Design::new(ids.id("top"));
-		des.add_const(&mut ids, BitVector::from_u64(0xDEADBEEF, 32));
+		des.add_const(&mut ids, BitVector::from_u64(0xDEADBEEF, 32), SrcInfo::default());
 		assert_eq!(des.nodes.count(), 1);
 		assert_eq!(des.prims.count(), 1);
 		assert_eq!(des.trim(), 2);

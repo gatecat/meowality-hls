@@ -110,6 +110,25 @@ impl BasicOp {
 					carry = (a & b) | (a & carry) | (b & carry);	
 				}
 			},
+			Sub => {
+				let mut carry = State::S1;
+				for i in 0..result.len() {
+					let a = operands[0].get_ext(i);
+					let b = !operands[1].get_ext(i);
+					result.set(i, a ^ b ^ carry);
+					carry = (a & b) | (a & carry) | (b & carry);	
+				}
+			},
+			Mul => {
+				// TODO: is this correct for signendness too?
+				let mut shifted_a = operands[0].clone();
+				for b in operands[1].iter() {
+					if b == State::S1 {
+						result = Add.apply(&[result, shifted_a.clone()]);
+					}
+					shifted_a = Add.apply(&[shifted_a.clone(), shifted_a.clone()]);
+				}
+			},
 			BwAnd => for i in 0..result.len() { result.set(i, operands[0].get_ext(i) & operands[1].get_ext(i)); },
 			BwOr => for i in 0..result.len() { result.set(i, operands[0].get_ext(i) | operands[1].get_ext(i)); },
 			BwXor => for i in 0..result.len() { result.set(i, operands[0].get_ext(i) ^ operands[1].get_ext(i)); },

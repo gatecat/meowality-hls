@@ -44,6 +44,14 @@ impl Value {
 			_ => false,
 		}
 	}
+	pub fn is_fully_const(&self) -> bool {
+		match self {
+			Value::Constant(_) | Value::Func(_) | Value::Ref(_) => true,
+			Value::Structure(sv) => sv.values.values().all(|v| v.is_fully_const()),
+			Value::Array(vals) => vals.iter().all(|v| v.is_fully_const()),
+			_ => false,
+		}
+	}
 	// Create an outline value from a resolved type (with leaf values filled with Void)
 	pub fn from_type(st: &GenState, ty: &ResolvedTypes) -> Value {
 		use Value::*;

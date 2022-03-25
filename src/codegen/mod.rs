@@ -2,6 +2,7 @@ pub mod resolved_type;
 pub mod state;
 pub mod value;
 pub mod ident;
+pub mod eval;
 
 pub use value::{Value, ValuePathItem, Variable};
 pub use ident::Identifier;

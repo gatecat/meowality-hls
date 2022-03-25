@@ -1,3 +1,4 @@
+use crate::ast::SrcInfo;
 use crate::core::{BasicOp, BitVector, Constant, IdString, NamedItem, NamedStore, NullableIndex, StoreIndex};
 use crate::design::{PortRef, Node};
 use rustc_hash::FxHashMap;
@@ -98,16 +99,18 @@ pub struct Primitive {
 	pub typ: PrimitiveType,
 	pub attrs: FxHashMap<IdString, Constant>,
 	pub ports: NamedStore<PrimitivePort>,
+	pub src: SrcInfo,
 }
 
 impl Primitive {
-	pub fn new(name: IdString, typ: PrimitiveType) -> Primitive {
+	pub fn new(name: IdString, typ: PrimitiveType, src: SrcInfo) -> Primitive {
 		Primitive {
 			name: name,
 			index: NullableIndex::none(),
 			typ: typ,
 			attrs: FxHashMap::default(),
 			ports: NamedStore::new(),
+			src: src,
 		}
 	}
 }

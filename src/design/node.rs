@@ -1,3 +1,4 @@
+use crate::ast::SrcInfo;
 use crate::core::{IdString, ObjectStore, NullableIndex, StoreIndex, OperandType, NamedItem};
 use crate::design::Primitive;
 
@@ -16,10 +17,11 @@ pub struct Node {
 	pub latency: Option<u32>,
 	pub driver: PortRef,
 	pub users: ObjectStore<PortRef>,
+	pub src: SrcInfo,
 }
 
 impl Node {
-	pub fn new(name: IdString, typ: OperandType, driver: PortRef) -> Node {
+	pub fn new(name: IdString, typ: OperandType, driver: PortRef, src: SrcInfo) -> Node {
 		Node {
 			name: name,
 			index: NullableIndex::none(),
@@ -30,6 +32,7 @@ impl Node {
 			latency: None,
 			driver: driver,
 			users: ObjectStore::new(),
+			src: src,
 		}
 	}
 }

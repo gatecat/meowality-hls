@@ -34,6 +34,15 @@ impl <T: NullValue + PartialEq> Nullable<T> {
 		self.value
 	}
 	#[inline]
+	pub fn unwrap_or_err<U, F>(self, f: F) -> Result<T, U> where
+		F: FnOnce() -> U {
+		if self.value == T::NULL {
+			Err(f())
+		} else {
+			Ok(self.value)
+		}
+	}
+	#[inline]
 	pub fn map<U, F>(self, f: F) -> Option<U> where
 		F: FnOnce(T) -> U
 	{
