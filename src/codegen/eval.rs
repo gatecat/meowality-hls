@@ -1,4 +1,4 @@
-use crate::{BasicOp, BitVector};
+use crate::{BasicOp, BitVector, IdStringDb, IdString};
 use crate::ast::{SrcInfo, Expression, Statement, Operator};
 use crate::core::constids;
 use crate::codegen::state::*;
@@ -104,8 +104,22 @@ impl <'a> Eval<'a> {
 				let var_idx = self.st.vars.add(Variable {name: v.name, typ: var_type, value: var_init});
 				self.sc.var_map.insert(v.name, var_idx);
 			},
+			Block(b) => {
+				for b_st in b.iter() {
+					self.eval_st(b_st)?;
+				}
+			}
 			_ => {unimplemented!()}
 		}
 		Ok(())
+	}
+	pub fn init(ids: &'a mut IdStringDb, name: IdString) -> Self {
+		let state = GenState::new(ids, name);
+		let init_scope = GenScope::new(None);
+		Self {
+			st: state,
+			sc: init_scope,
+			is_const: false,
+		}
 	}
 }

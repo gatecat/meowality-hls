@@ -26,6 +26,17 @@ pub struct GenState<'a> {
 }
 
 impl <'a> GenState<'a> {
+	pub fn new(ids: &'a mut IdStringDb, name: IdString) -> Self {
+		Self {
+			ids: ids,
+			vars: ObjectStore::new(),
+			funcs: FxHashMap::default(),
+			structs: FxHashMap::default(),
+			des: Design::new(name),
+			conds: Vec::new(),
+			auto_idx: 0,
+		}
+	} 
 	pub fn next_name(&mut self, base: IdString) -> IdString {
 		self.auto_idx += 1;
 		let new_name = format!("{}${}$", self.ids.get_str(base), self.auto_idx);
