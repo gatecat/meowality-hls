@@ -6,8 +6,8 @@ use crate::codegen::{ResolvedType, ResolvedTypes, Value, Variable};
 use crate::design::PrimitiveType;
 
 pub struct Eval <'a> {
-	pub st: &'a mut GenState<'a>,
-	pub sc: &'a mut GenScope<'a>,
+	pub st: GenState<'a>,
+	pub sc: GenScope<'a>,
 	pub is_const: bool,
 }
 
@@ -17,7 +17,7 @@ impl <'a> Eval<'a> {
 		let mut const_vals = Vec::new();
 		let mut fully_const = true;
 		for arg in args.iter() {
-			let val_type = arg.to_type(self.st).unwrap(); // TODO: why could this ever not resolve?
+			let val_type = arg.to_type(&self.st).unwrap(); // TODO: why could this ever not resolve?
 			if let ResolvedTypes::Integer(it) = val_type.typ {
 				types.push(it);
 			} else {
@@ -75,15 +75,14 @@ impl <'a> Eval<'a> {
 			_ => {unimplemented!()}
 		}
 	}
-	pub fn const_eval(&'a mut self, expr: &Expression) -> Result<Value, CodegenError> {
-		let mut ce = Eval {
-			st: self.st,
-			sc: self.sc,
-			is_const: true
-		};
-		ce.eval_expr(expr)
+	pub fn const_eval(&mut self, expr: &Expression) -> Result<Value, CodegenError> {
+		let old_is_const = self.is_const;
+		self.is_const = true;
+		let result = self.eval_expr(expr);
+		self.is_const = old_is_const;
+		result
 	}
-	pub fn const_eval_scalar(&'a mut self, expr: &Expression) -> Result<BitVector, CodegenError> {
+	pub fn const_eval_scalar(&mut self, expr: &Expression) -> Result<BitVector, CodegenError> {
 		let result = self.const_eval(expr)?;
 		if let Value::Constant(c) = result {
 			Ok(c)
@@ -91,7 +90,7 @@ impl <'a> Eval<'a> {
 			Err(CodegenError(expr.src, format!("expected scalar constant got {:?}", result)))
 		}
 	}
-	pub fn eval_st(&'a mut self, st: &Statement) -> Result<(), CodegenError> {
+	pub fn eval_st(&mut self, st: &Statement) -> Result<(), CodegenError> {
 		use crate::ast::StatementType::*;
 		match &st.ty {
 			Null => {},

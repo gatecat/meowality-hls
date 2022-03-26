@@ -113,7 +113,7 @@ impl ResolvedType {
 			}?
 		})
 	}
-	pub fn do_resolve<'a>(e: &'a mut Eval<'a>, dt: &DataType) -> Result<ResolvedType, CodegenError> {
+	pub fn do_resolve<'a>(e: &mut Eval, dt: &DataType) -> Result<ResolvedType, CodegenError> {
 		use crate::ast::DataTypes;
 		use ResolvedTypes::*;
 		let base_type = match &dt.typ {
