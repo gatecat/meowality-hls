@@ -1,18 +1,18 @@
-use crate::BasicOp;
-use crate::ast::{SrcInfo, Expression, Operator};
+use crate::{BasicOp, BitVector};
+use crate::ast::{SrcInfo, Expression, Statement, Operator};
 use crate::core::constids;
 use crate::codegen::state::*;
-use crate::codegen::{ResolvedTypes, Value};
+use crate::codegen::{ResolvedType, ResolvedTypes, Value, Variable};
 use crate::design::PrimitiveType;
 
-struct Eval <'a> {
+pub struct Eval <'a> {
 	pub st: &'a mut GenState<'a>,
 	pub sc: &'a mut GenScope<'a>,
 	pub is_const: bool,
 }
 
 impl <'a> Eval<'a> {
-	fn op_value(&mut self, src: SrcInfo, op: BasicOp, args: Vec<Value>) -> Result<Value, CodegenError> {
+	pub fn op_value(&mut self, src: SrcInfo, op: BasicOp, args: Vec<Value>) -> Result<Value, CodegenError> {
 		let mut types = Vec::new();
 		let mut const_vals = Vec::new();
 		let mut fully_const = true;
@@ -46,14 +46,14 @@ impl <'a> Eval<'a> {
 			Ok(Value::from_node(self.st.des.add_node(node_name, res_type, src, prim, constids::Q).unwrap()))
 		}
 	}
-	fn eval_oper(&mut self, src: SrcInfo, ty: Operator, args: Vec<Value>) -> Result<Value, CodegenError> {
+	pub fn eval_oper(&mut self, src: SrcInfo, ty: Operator, args: Vec<Value>) -> Result<Value, CodegenError> {
 		use crate::ast::Operator::*;
 		match ty {
 			Add => self.op_value(src, BasicOp::Add, args),
 			_ => unimplemented!()
 		}
 	}
-	fn eval_expr(&mut self, expr: &Expression) -> Result<Value, CodegenError> {
+	pub fn eval_expr(&mut self, expr: &Expression) -> Result<Value, CodegenError> {
 		use crate::ast::ExprType::*;
 		match &expr.ty { 
 			Literal(x) => Ok(Value::Constant(x.clone())),
@@ -74,5 +74,39 @@ impl <'a> Eval<'a> {
 			Null => Ok(Value::Void),
 			_ => {unimplemented!()}
 		}
+	}
+	pub fn const_eval(&'a mut self, expr: &Expression) -> Result<Value, CodegenError> {
+		let mut ce = Eval {
+			st: self.st,
+			sc: self.sc,
+			is_const: true
+		};
+		ce.eval_expr(expr)
+	}
+	pub fn const_eval_scalar(&'a mut self, expr: &Expression) -> Result<BitVector, CodegenError> {
+		let result = self.const_eval(expr)?;
+		if let Value::Constant(c) = result {
+			Ok(c)
+		} else {
+			Err(CodegenError(expr.src, format!("expected scalar constant got {:?}", result)))
+		}
+	}
+	pub fn eval_st(&'a mut self, st: &Statement) -> Result<(), CodegenError> {
+		use crate::ast::StatementType::*;
+		match &st.ty {
+			Null => {},
+			Var(v) => {
+				let var_init = if let Some(i) = &v.init {
+					self.eval_expr(i)?
+				} else {
+					Value::Void
+				};
+				let var_type = ResolvedType::do_resolve(self, &v.ty)?;
+				let var_idx = self.st.vars.add(Variable {name: v.name, typ: var_type, value: var_init});
+				self.sc.var_map.insert(v.name, var_idx);
+			},
+			_ => {unimplemented!()}
+		}
+		Ok(())
 	}
 }

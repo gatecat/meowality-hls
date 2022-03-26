@@ -1,8 +1,9 @@
-use crate::ast::Function;
+use crate::ast::{DataType, Function};
 use rustc_hash::FxHashMap;
 use crate::core::IdString;
 use crate::core::{BitVector, OperandType};
-use crate::codegen::Identifier;
+use crate::codegen::{CodegenError, Identifier};
+use crate::codegen::eval::Eval;
 use std::fmt;
 
 // Resolved template arguments
@@ -111,6 +112,20 @@ impl ResolvedType {
 				},
 			}?
 		})
+	}
+	pub fn do_resolve<'a>(e: &'a mut Eval<'a>, dt: &DataType) -> Result<ResolvedType, CodegenError> {
+		use crate::ast::DataTypes;
+		use ResolvedTypes::*;
+		let base_type = match &dt.typ {
+			DataTypes::Void => ResolvedType {typ: Void, is_static: false, is_const: false},
+			DataTypes::Integer(i) => {
+				let width = e.const_eval_scalar(&i.width)?.as_u64() as usize;
+				let is_signed = e.const_eval_scalar(&i.is_signed)?.as_u64() != 0;
+				ResolvedType {typ: Integer(OperandType::new(width, is_signed)), is_static: false, is_const: false}
+			},
+			_ => unimplemented!()
+		};
+		Ok(base_type)
 	}
 }
 
