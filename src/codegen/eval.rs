@@ -7,7 +7,6 @@ use crate::design::PrimitiveType;
 
 pub struct Eval <'a> {
 	pub st: GenState<'a>,
-	pub sc: GenScope<'a>,
 	pub is_const: bool,
 }
 
@@ -58,7 +57,7 @@ impl <'a> Eval<'a> {
 		match &expr.ty { 
 			Literal(x) => Ok(Value::Constant(x.clone())),
 			Variable(v) => {
-				let var_idx = self.sc.lookup_var(*v).unwrap_or_err(|| CodegenError(expr.src, format!("unable to resolve variable {}", v)))?;
+				let var_idx = self.st.lookup_var(*v).unwrap_or_err(|| CodegenError(expr.src, format!("unable to resolve variable {}", v)))?;
 				let value = self.st.vars.get(var_idx).value.clone();
 				if self.is_const && !value.is_fully_const() {
 					Err(CodegenError(expr.src, format!("attempting to use non-constant value {:?} in constant ctx", v)))
@@ -102,11 +101,40 @@ impl <'a> Eval<'a> {
 				};
 				let var_type = ResolvedType::do_resolve(self, &v.ty)?;
 				let var_idx = self.st.vars.add(Variable {name: v.name, typ: var_type, value: var_init});
-				self.sc.var_map.insert(v.name, var_idx);
+				self.st.scope().var_map.insert(v.name, var_idx);
 			},
 			Block(b) => {
+				self.st.push_scope();
 				for b_st in b.iter() {
 					self.eval_st(b_st)?;
+				}
+				self.st.pop_scope();
+			}
+			If(ifs) => {
+				let eval_cond = self.eval_expr(&ifs.cond)?;
+				if let Value::Constant(c) = eval_cond {
+					// const eval if
+					if c.as_bool() {
+						self.eval_st(&ifs.if_true)?;
+					} else if let Some(fls) = &ifs.if_false {
+						self.eval_st(fls)?;
+					}
+				} else {
+					if ifs.is_meta {
+						return Err(CodegenError(st.src, format!("expected constant condition for 'if constexpr' got {:?}", eval_cond)));
+					}
+					if let Value::Node(n) = eval_cond {
+						self.st.push_cond(n, false);
+						self.eval_st(&ifs.if_true)?;
+						self.st.pop_cond();
+						if let Some(fls) = &ifs.if_false {
+							self.st.push_cond(n, true);
+							self.eval_st(fls)?;
+							self.st.pop_cond();
+						}
+					} else {
+						return Err(CodegenError(st.src, format!("expected scalar condition for 'if constexpr' got {:?}", eval_cond)));
+					}
 				}
 			}
 			_ => {unimplemented!()}
@@ -115,10 +143,8 @@ impl <'a> Eval<'a> {
 	}
 	pub fn init(ids: &'a mut IdStringDb, name: IdString) -> Self {
 		let state = GenState::new(ids, name);
-		let init_scope = GenScope::new(None);
 		Self {
 			st: state,
-			sc: init_scope,
 			is_const: false,
 		}
 	}

@@ -20,6 +20,8 @@ pub struct GenState<'a> {
 	pub structs: FxHashMap<ResolvedKey, DerivedStruct>,
 	// The elaborated design
 	pub des: Design,
+	// The current stack of scopes
+	scopes: Vec<GenScope>,
 	// The current stack of conditionals to be applied by the evaluator
 	conds: Vec<(StoreIndex<Node>, bool)>,
 	auto_idx: usize,
@@ -33,6 +35,7 @@ impl <'a> GenState<'a> {
 			funcs: FxHashMap::default(),
 			structs: FxHashMap::default(),
 			des: Design::new(name),
+			scopes: vec![GenScope::new(0)],
 			conds: Vec::new(),
 			auto_idx: 0,
 		}
@@ -99,41 +102,55 @@ impl <'a> GenState<'a> {
 			}
 		}
 	}
+	pub fn scope(&mut self) -> &mut GenScope {
+		self.scopes.last_mut().unwrap()
+	}
+	pub fn push_scope(&mut self) {
+		self.scopes.push(GenScope::new(self.conds.len()));
+	}
+	pub fn pop_scope(&mut self) {
+		self.scopes.pop();
+	}
+	pub fn push_cond(&mut self, cond: StoreIndex<Node>, invert: bool) {
+		self.conds.push((cond, invert))
+	}
+	pub fn pop_cond(&mut self) {
+		self.conds.pop();
+	}
+	pub fn lookup_var(&self, ident: IdString) -> NullableIndex<Variable> {
+		for scope in self.scopes.iter().rev() {
+			if let Some(var) = scope.var_map.get(&ident) {
+				return NullableIndex::some(*var);
+			}
+		}
+		return NullableIndex::none();
+	}
+	pub fn lookup_type(&self, ident: IdString) -> Option<&ResolvedType> {
+		for scope in self.scopes.iter().rev() {
+			if let Some(typ) = scope.type_map.get(&ident) {
+				return Some(typ);
+			}
+		}
+		return None;
+	}
 }
 
 // Codegen state for a specific scope
-pub struct GenScope<'a> {
-	pub parent_scope: Option<&'a GenScope<'a>>,
+pub struct GenScope {
 	// Mapping from var names in the current scope to concrete variable indices
 	pub var_map: FxHashMap<IdString, StoreIndex<Variable>>,
 	// Mapping from type names in the current scope to resolved types
 	pub type_map: FxHashMap<IdString, ResolvedType>,
+	// Index into the condition stack where this scope starts
+	pub cond_idx: usize,
 }
 
-impl <'a> GenScope<'a> {
-	pub fn new(parent_scope: Option<&'a GenScope<'a>>) -> GenScope<'a> {
+impl GenScope {
+	pub fn new(cond_idx: usize) -> GenScope {
 		GenScope {
-			parent_scope: parent_scope,
 			var_map: FxHashMap::default(),
 			type_map: FxHashMap::default(),
-		}
-	}
-	pub fn lookup_var(&self, ident: IdString) -> NullableIndex<Variable> {
-		if let Some(var) = self.var_map.get(&ident) {
-			NullableIndex::some(*var)
-		} else if let Some(parent) = self.parent_scope {
-			parent.lookup_var(ident)
-		} else {
-			NullableIndex::none()
-		}
-	}
-	pub fn lookup_type(&self, ident: IdString) -> Option<&ResolvedType> {
-		if let Some(typ) = self.type_map.get(&ident) {
-			Some(typ)
-		} else if let Some(parent) = self.parent_scope {
-			parent.lookup_type(ident)
-		} else {
-			None
+			cond_idx: cond_idx,
 		}
 	}
 }

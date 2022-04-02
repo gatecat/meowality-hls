@@ -216,6 +216,9 @@ impl BitVector {
 			None
 		}
 	}
+	pub fn as_bool(&self) -> bool {
+		self.chunks.iter().any(|c| c.value != 0)
+	}
 	pub fn to_str(&self) -> String {
 		(0..self.len()).rev().map(|i| self.get(i).unwrap().to_char()).collect()
 	}
