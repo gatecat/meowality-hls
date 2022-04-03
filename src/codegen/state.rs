@@ -87,7 +87,7 @@ impl <'a> GenState<'a> {
 				RValue::Array(values) => {
 					for (i, val) in values.iter().enumerate() {
 						let mut next_path = Vec::from(path);
-						next_path.push(ValuePathItem::Index(i));
+						next_path.push(ValuePathItem::ConstIndex(i));
 						self.assign_variable(var, &next_path, val, src);
 					}
 				},

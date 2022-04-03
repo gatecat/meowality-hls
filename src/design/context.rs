@@ -1,7 +1,9 @@
 use crate::StoreIndex;
 use crate::ast::SrcInfo;
 use crate::core::{constids, BitVector, IdString, IdStringDb, NamedStore, OperandType};
-use crate::design::{Node, PortRef, Primitive, PrimitivePort, PrimitiveType};
+use crate::design::{Node, PortRef, Primitive, PrimitivePort, PrimitiveType, PortDir};
+
+use std::fmt;
 
 pub struct Context {
 	pub ids: IdStringDb,
@@ -37,6 +39,17 @@ impl Design {
 		let node_idx = self.nodes.add(Node::new(name, ty, PortRef { prim: driver, port: driver_port }, src))?;
 		self.prims.get_mut(driver).ports.add(PrimitivePort::output(driver_port, node_idx))?;
 		Ok(node_idx)
+	}
+	pub fn add_port(&mut self, name: IdString, ty: OperandType, dir: PortDir) -> Result<StoreIndex<Node>, String> {
+		let prim_idx = self.add_prim(name, PrimitiveType::TopPort, SrcInfo::default())?;
+		match dir {
+			PortDir::Input => {
+				self.add_node(name, ty, SrcInfo::default(), prim_idx, constids::PORT)
+			},
+			PortDir::Output => {
+				unimplemented!();
+			}
+		}
 	}
 	pub fn add_prim_input(&mut self, prim: StoreIndex<Primitive>, name: IdString, node: StoreIndex<Node>) -> Result<StoreIndex<PrimitivePort>, String> {
 		let usr_idx = self.nodes.get_mut(node).users.add(PortRef { prim: prim, port: name });
@@ -101,6 +114,25 @@ impl Design {
 			if iter_count == 0 { break; }
 		}
 		total_count
+	}
+}
+
+impl fmt::Debug for Design {
+	fn fmt(&self, fmt : &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+		writeln!(fmt, "design {:?}", self.name)?;
+		for (_, node) in self.nodes.iter() {
+			writeln!(fmt, "    node {:?} {:?}", node.typ, node.name)?;
+		}
+		writeln!(fmt, "")?;
+		for (_, prim) in self.prims.iter() {
+			write!(fmt, "    prim {:?} {:?}", prim.typ, prim.name)?;
+			for (_, port) in prim.ports.iter() {
+				write!(fmt, " .{:?}({:?})", port.name, port.node.map(|n| self.nodes.get(n).name).unwrap_or(IdString::NONE))?;
+			}
+			writeln!(fmt, "")?;
+		}
+		writeln!(fmt, "")?;
+		Ok(())
 	}
 }
 

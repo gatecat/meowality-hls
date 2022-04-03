@@ -62,11 +62,16 @@ fn main() -> Result<(), String> {
 	for st in sts.iter() {
 		if let StatementType::Module(m) = &st.ty {
 			println!("*** MODULE {} ***", ids.get_str(m.name));
-			let mut e = crate::codegen::eval::Eval::init(&mut ids, m.name);
-			e.eval_st(&m.content).map_err(|e| e.1.to_string())?;
-			for (_, v) in e.st.vars.iter() {
-				println!("  {:?}: {:?} = {:?}", ids.get_str(v.name), v.typ, v.value);
-			}
+			let raw_design = {
+				let mut e = crate::codegen::eval::Eval::init(&mut ids, m);
+				e.eval_mod(m).map_err(|e| e.1.to_string())?;
+				/* for (_, v) in e.st.vars.iter() {
+					println!("  {:?}: {:?} = {:?}", ids.get_str(v.name), v.typ, v.value);
+				}*/ 
+				println!("");
+				format!("{:?}", e.st.des)
+			};
+			println!("{}", &conv_ids(&ids, &raw_design));
 		}
 	}
 	Ok(())

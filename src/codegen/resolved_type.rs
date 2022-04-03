@@ -127,6 +127,13 @@ impl ResolvedType {
 		};
 		Ok(base_type)
 	}
+	pub fn pack(&self) -> Result<OperandType, CodegenError> {
+		match self.typ {
+			ResolvedTypes::Void => Ok(OperandType::new(0, false)),
+			ResolvedTypes::Integer(i) => Ok(i),
+			_ => unimplemented!(),
+		}
+	}
 }
 
 // A derived structure

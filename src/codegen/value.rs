@@ -95,7 +95,7 @@ impl RValue {
 			*self = val;
 		} else {
 			match &path[0] {
-				ValuePathItem::Index(idx) => {
+				ValuePathItem::ConstIndex(idx) => {
 					if let RValue::Array(vals) = self {
 						vals[*idx].set(&path[1..], val);
 					} else {
@@ -108,7 +108,8 @@ impl RValue {
 					} else {
 						panic!("expected structure");
 					}
-				}
+				},
+				ValuePathItem::VarIndex(_) => unimplemented!()
 			}
 		}
 	}
@@ -118,7 +119,7 @@ impl RValue {
 			self
 		} else {
 			match &path[0] {
-				ValuePathItem::Index(idx) => {
+				ValuePathItem::ConstIndex(idx) => {
 					if let RValue::Array(vals) = self {
 						vals[*idx].get(&path[1..])
 					} else {
@@ -132,6 +133,7 @@ impl RValue {
 						panic!("expected structure");
 					}
 				}
+				ValuePathItem::VarIndex(_) => unimplemented!()
 			}
 		}
 	}
@@ -151,8 +153,24 @@ impl fmt::Debug for RValue {
 }
 
 // This enables us to point to deep within a value
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum ValuePathItem {
-	Index(usize),
+	ConstIndex(usize),
+	VarIndex(RValue),
 	Member(IdString),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct LValue {
+	pub var: StoreIndex<Variable>,
+	pub path: Vec<ValuePathItem>,
+}
+
+impl LValue {
+	pub fn from_var(var: StoreIndex<Variable>) -> LValue {
+		LValue {
+			var: var,
+			path: Vec::new(),
+		}
+	}
 }
