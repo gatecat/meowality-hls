@@ -9,52 +9,51 @@ use rustc_hash::FxHashMap;
 pub struct Variable {
 	pub name: IdString,
 	pub typ: ResolvedType,
-	pub value: Value,
+	pub value: RValue,
 }
 
 // The contents of a structure
 #[derive(Clone, Eq, PartialEq)]
 pub struct StructureValue {
 	pub typ: ResolvedKey,
-	pub values: FxHashMap<IdString, Value>,
+	pub values: FxHashMap<IdString, RValue>,
 }
 
 // Lots of different things can be 'values' in our codegen IL
 #[derive(Clone, Eq, PartialEq)]
-pub enum Value {
+pub enum RValue {
 	Void, // void type, probably shouldn't exist
 	Constant(BitVector), // a resolved constant value
 	Node(StoreIndex<Node>), // variables become pointers to nodes in the design being elaborated
 	Structure(StructureValue), // a structure, stored as the structure type and name-value map
-	Array(Vec<Value>), // an array, stored as a list of values
+	Array(Vec<RValue>), // an array, stored as a list of values
 	Func(StoreIndex<Function>), // a function 'pointer'
-	Ref(StoreIndex<Variable>), // a reference to another variable (TODO: what are we actually indexing) 
 }
-impl Value {
-	pub fn from_node(node: StoreIndex<Node>) -> Value {
-		Value::Node(node)
+impl RValue {
+	pub fn from_node(node: StoreIndex<Node>) -> RValue {
+		RValue::Node(node)
 	}
-	pub fn from_const(constant: BitVector) -> Value {
-		Value::Constant(constant)
+	pub fn from_const(constant: BitVector) -> RValue {
+		RValue::Constant(constant)
 	}
 
 	pub fn is_scalar(&self) -> bool {
 		match self {
-			Value::Constant(_) | Value::Node(_) => true,
+			RValue::Constant(_) | RValue::Node(_) => true,
 			_ => false,
 		}
 	}
 	pub fn is_fully_const(&self) -> bool {
 		match self {
-			Value::Constant(_) | Value::Func(_) | Value::Ref(_) => true,
-			Value::Structure(sv) => sv.values.values().all(|v| v.is_fully_const()),
-			Value::Array(vals) => vals.iter().all(|v| v.is_fully_const()),
+			RValue::Constant(_) | RValue::Func(_) => true,
+			RValue::Structure(sv) => sv.values.values().all(|v| v.is_fully_const()),
+			RValue::Array(vals) => vals.iter().all(|v| v.is_fully_const()),
 			_ => false,
 		}
 	}
 	// Create an outline value from a resolved type (with leaf values filled with Void)
-	pub fn from_type(st: &GenState, ty: &ResolvedTypes) -> Value {
-		use Value::*;
+	pub fn from_type(st: &GenState, ty: &ResolvedTypes) -> RValue {
+		use RValue::*;
 		match ty {
 			ResolvedTypes::Integer(it) => Constant(BitVector::undefined(it.width, it.is_signed)),
 			ResolvedTypes::Struct(key) => {
@@ -75,39 +74,36 @@ impl Value {
 			is_const: true,
 			is_static: false,
 			typ: match self {
-				Value::Void => Some(ResolvedTypes::Void),
-				Value::Constant(bv) => Some(ResolvedTypes::Integer(bv.op_type())),
-				Value::Node(n) => Some(ResolvedTypes::Integer(st.des.nodes.get(*n).typ)),
-				Value::Structure(sv) => Some(ResolvedTypes::Struct(sv.typ.clone())),	
-				Value::Array(vals) => {
+				RValue::Void => Some(ResolvedTypes::Void),
+				RValue::Constant(bv) => Some(ResolvedTypes::Integer(bv.op_type())),
+				RValue::Node(n) => Some(ResolvedTypes::Integer(st.des.nodes.get(*n).typ)),
+				RValue::Structure(sv) => Some(ResolvedTypes::Struct(sv.typ.clone())),	
+				RValue::Array(vals) => {
 					let mut typ = ResolvedType { is_const: true, is_static: false, typ: ResolvedTypes::Void };
 					for val in vals.iter() {
 						typ = typ.merge(&val.to_type(st)?)?;
 					}
 					Some(typ.typ)
 				},
-				Value::Ref(v) => {
-					Some(ResolvedTypes::Reference(Box::new(st.vars.get(*v).typ.clone())))
-				}
 				_ => unimplemented!(),
 			}?
 		})
 	}
 	// Replace a value, following a path
-	pub fn set(&mut self, path: &[ValuePathItem], val: Value) {
+	pub fn set(&mut self, path: &[ValuePathItem], val: RValue) {
 		if path.len() == 0 {
 			*self = val;
 		} else {
 			match &path[0] {
 				ValuePathItem::Index(idx) => {
-					if let Value::Array(vals) = self {
+					if let RValue::Array(vals) = self {
 						vals[*idx].set(&path[1..], val);
 					} else {
 						panic!("expected array");
 					}
 				},
 				ValuePathItem::Member(m) => {
-					if let Value::Structure(sv) = self {
+					if let RValue::Structure(sv) = self {
 						sv.values.get_mut(m).unwrap().set(&path[1..], val);
 					} else {
 						panic!("expected structure");
@@ -117,20 +113,20 @@ impl Value {
 		}
 	}
 	// Get a value following a path
-	pub fn get(&self, path: &[ValuePathItem]) -> &Value {
+	pub fn get(&self, path: &[ValuePathItem]) -> &RValue {
 		if path.len() == 0 {
 			self
 		} else {
 			match &path[0] {
 				ValuePathItem::Index(idx) => {
-					if let Value::Array(vals) = self {
+					if let RValue::Array(vals) = self {
 						vals[*idx].get(&path[1..])
 					} else {
 						panic!("expected array");
 					}
 				},
 				ValuePathItem::Member(m) => {
-					if let Value::Structure(sv) = self {
+					if let RValue::Structure(sv) = self {
 						sv.values.get(m).unwrap().get(&path[1..])
 					} else {
 						panic!("expected structure");
@@ -141,9 +137,9 @@ impl Value {
 	}
 }
 
-impl fmt::Debug for Value {
+impl fmt::Debug for RValue {
 	fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-		use Value::*;
+		use RValue::*;
 		match self {
 			Void => write!(fmt, "<void>")?,
 			Constant(v) => write!(fmt, "{:?}", v)?,

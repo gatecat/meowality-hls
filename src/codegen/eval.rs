@@ -2,7 +2,7 @@ use crate::{BasicOp, BitVector, IdStringDb, IdString};
 use crate::ast::{SrcInfo, Expression, Statement, Operator};
 use crate::core::constids;
 use crate::codegen::state::*;
-use crate::codegen::{ResolvedType, ResolvedTypes, Value, Variable};
+use crate::codegen::{ResolvedType, ResolvedTypes, RValue, Variable};
 use crate::design::PrimitiveType;
 
 pub struct Eval <'a> {
@@ -11,7 +11,7 @@ pub struct Eval <'a> {
 }
 
 impl <'a> Eval<'a> {
-	pub fn op_value(&mut self, src: SrcInfo, op: BasicOp, args: Vec<Value>) -> Result<Value, CodegenError> {
+	pub fn op_value(&mut self, src: SrcInfo, op: BasicOp, args: Vec<RValue>) -> Result<RValue, CodegenError> {
 		let mut types = Vec::new();
 		let mut const_vals = Vec::new();
 		let mut fully_const = true;
@@ -22,7 +22,7 @@ impl <'a> Eval<'a> {
 			} else {
 				return Err(CodegenError(src, format!("non-scalar value {:?} passed to operator {:?}", arg, op)));
 			}
-			if let Value::Constant(c) = arg {
+			if let RValue::Constant(c) = arg {
 				const_vals.push(c.clone());
 			} else {
 				fully_const = false;
@@ -30,7 +30,7 @@ impl <'a> Eval<'a> {
 		}
 		if fully_const {
 			// Constant fold
-			Ok(Value::Constant(op.apply(&const_vals)))
+			Ok(RValue::Constant(op.apply(&const_vals)))
 		} else {
 			// Create a node
 			let res_type = op.result_type(&types);
@@ -42,20 +42,20 @@ impl <'a> Eval<'a> {
 				self.st.des.add_prim_input(prim, input_names[i], node).unwrap();
 			}
 			let node_name = self.st.des.auto_id(self.st.ids); // todo: more descriptive
-			Ok(Value::from_node(self.st.des.add_node(node_name, res_type, src, prim, constids::Q).unwrap()))
+			Ok(RValue::from_node(self.st.des.add_node(node_name, res_type, src, prim, constids::Q).unwrap()))
 		}
 	}
-	pub fn eval_oper(&mut self, src: SrcInfo, ty: Operator, args: Vec<Value>) -> Result<Value, CodegenError> {
+	pub fn eval_oper(&mut self, src: SrcInfo, ty: Operator, args: Vec<RValue>) -> Result<RValue, CodegenError> {
 		use crate::ast::Operator::*;
 		match ty {
 			Add => self.op_value(src, BasicOp::Add, args),
 			_ => unimplemented!()
 		}
 	}
-	pub fn eval_expr(&mut self, expr: &Expression) -> Result<Value, CodegenError> {
+	pub fn eval_expr(&mut self, expr: &Expression) -> Result<RValue, CodegenError> {
 		use crate::ast::ExprType::*;
 		match &expr.ty { 
-			Literal(x) => Ok(Value::Constant(x.clone())),
+			Literal(x) => Ok(RValue::Constant(x.clone())),
 			Variable(v) => {
 				let var_idx = self.st.lookup_var(*v).unwrap_or_err(|| CodegenError(expr.src, format!("unable to resolve variable {}", v)))?;
 				let value = self.st.vars.get(var_idx).value.clone();
@@ -70,11 +70,11 @@ impl <'a> Eval<'a> {
 				for a in args.iter() { mapped_args.push(self.eval_expr(a)?); }
 				self.eval_oper(expr.src, *ty, mapped_args)
 			},
-			Null => Ok(Value::Void),
+			Null => Ok(RValue::Void),
 			_ => {unimplemented!()}
 		}
 	}
-	pub fn const_eval(&mut self, expr: &Expression) -> Result<Value, CodegenError> {
+	pub fn const_eval(&mut self, expr: &Expression) -> Result<RValue, CodegenError> {
 		let old_is_const = self.is_const;
 		self.is_const = true;
 		let result = self.eval_expr(expr);
@@ -83,7 +83,7 @@ impl <'a> Eval<'a> {
 	}
 	pub fn const_eval_scalar(&mut self, expr: &Expression) -> Result<BitVector, CodegenError> {
 		let result = self.const_eval(expr)?;
-		if let Value::Constant(c) = result {
+		if let RValue::Constant(c) = result {
 			Ok(c)
 		} else {
 			Err(CodegenError(expr.src, format!("expected scalar constant got {:?}", result)))
@@ -97,7 +97,7 @@ impl <'a> Eval<'a> {
 				let var_init = if let Some(i) = &v.init {
 					self.eval_expr(i)?
 				} else {
-					Value::Void
+					RValue::Void
 				};
 				let var_type = ResolvedType::do_resolve(self, &v.ty)?;
 				let var_idx = self.st.vars.add(Variable {name: v.name, typ: var_type, value: var_init});
@@ -112,7 +112,7 @@ impl <'a> Eval<'a> {
 			}
 			If(ifs) => {
 				let eval_cond = self.eval_expr(&ifs.cond)?;
-				if let Value::Constant(c) = eval_cond {
+				if let RValue::Constant(c) = eval_cond {
 					// const eval if
 					if c.as_bool() {
 						self.eval_st(&ifs.if_true)?;
@@ -123,7 +123,7 @@ impl <'a> Eval<'a> {
 					if ifs.is_meta {
 						return Err(CodegenError(st.src, format!("expected constant condition for 'if constexpr' got {:?}", eval_cond)));
 					}
-					if let Value::Node(n) = eval_cond {
+					if let RValue::Node(n) = eval_cond {
 						self.st.push_cond(n, false);
 						self.eval_st(&ifs.if_true)?;
 						self.st.pop_cond();

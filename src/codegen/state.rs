@@ -45,14 +45,14 @@ impl <'a> GenState<'a> {
 		let new_name = format!("{}${}$", self.ids.get_str(base), self.auto_idx);
 		self.ids.id(&new_name)
 	}
-	pub fn get_node(&mut self, value: &Value, src: SrcInfo) -> StoreIndex<Node> {
+	pub fn get_node(&mut self, value: &RValue, src: SrcInfo) -> StoreIndex<Node> {
 		match value {
-			Value::Node(n) => *n,
-			Value::Constant(c) => self.des.add_const(self.ids, c.clone(), src),
+			RValue::Node(n) => *n,
+			RValue::Constant(c) => self.des.add_const(self.ids, c.clone(), src),
 			_ => unreachable!(),
 		}
 	}
-	pub fn apply_conditionals(&mut self, base_name: IdString, old_value: Value, new_value: Value, src: SrcInfo) -> Value {
+	pub fn apply_conditionals(&mut self, base_name: IdString, old_value: RValue, new_value: RValue, src: SrcInfo) -> RValue {
 		if self.conds.is_empty() {
 			return new_value;
 		}
@@ -72,9 +72,9 @@ impl <'a> GenState<'a> {
 		}
 		let typ = self.des.nodes.get(new_node).typ;
 		let node_name = self.next_name(base_name);
-		Value::from_node(self.des.add_node(node_name, typ, src, prim, constids::Q).unwrap())
+		RValue::from_node(self.des.add_node(node_name, typ, src, prim, constids::Q).unwrap())
 	}
-	pub fn assign_variable(&mut self, var: StoreIndex<Variable>, path: &[ValuePathItem], new_value: &Value, src: SrcInfo) {
+	pub fn assign_variable(&mut self, var: StoreIndex<Variable>, path: &[ValuePathItem], new_value: &RValue, src: SrcInfo) {
 		let curr_value = self.vars.get(var).value.get(path).clone();
 		if curr_value.is_scalar() {
 			// at the end of the line, actually assign the value
@@ -84,14 +84,14 @@ impl <'a> GenState<'a> {
 			self.vars.get_mut(var).value.set(path, applied_value);
 		} else {
 			match new_value {
-				Value::Array(values) => {
+				RValue::Array(values) => {
 					for (i, val) in values.iter().enumerate() {
 						let mut next_path = Vec::from(path);
 						next_path.push(ValuePathItem::Index(i));
 						self.assign_variable(var, &next_path, val, src);
 					}
 				},
-				Value::Structure(sv) => {
+				RValue::Structure(sv) => {
 					for (key, val) in sv.values.iter() {
 						let mut next_path = Vec::from(path);
 						next_path.push(ValuePathItem::Member(*key));
