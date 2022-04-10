@@ -19,6 +19,7 @@ constids! {
 	typedef,
 	using,
 	r#struct,
+	interface,
 	r#enum,
 	r#union,
 	r#if,

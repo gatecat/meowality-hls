@@ -8,6 +8,8 @@ pub struct Parser<Iter: Iterator<Item=char>> {
 	// for scope resolution
 	namespace_stack: Vec<Namespace>,
 	statement_stack: Vec<Statement>,
+	// special casing
+	is_interface: bool,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -32,6 +34,7 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			state: state,
 			namespace_stack: Vec::new(),
 			statement_stack: Vec::new(),
+			is_interface: false,
 		}
 	}
 	pub fn do_parse(&mut self, ids: &mut IdStringDb) ->  Result<Vec<Statement>, ParserError> {
@@ -152,6 +155,25 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 			Ok(Some(Statement::new(
 				Struct(StructureDef {
 					name: name,
+					is_interface: false,
+					templ_args: tdecl,
+					block: Box::new(content),
+					attrs: attrs.clone(),
+					src: SrcInfo::default(),
+				}), attrs
+			)))
+		} else if self.state.consume_kw(ids, constids::r#interface)? {
+			let name = self.state.expect_ident(ids)?;
+			// TODO: inheritance
+			let old_is_if = self.is_interface;
+			self.is_interface = true;
+			let content = self.parse_block(ids, &ScopeLevel { parent: Some(curr_scope), entry: &StructHeaderEntry { name: name } })?;
+			self.state.expect_sym(ids, ";")?;
+			self.is_interface = old_is_if;
+			Ok(Some(Statement::new(
+				Struct(StructureDef {
+					name: name,
+					is_interface: true,
 					templ_args: tdecl,
 					block: Box::new(content),
 					attrs: attrs.clone(),
@@ -237,15 +259,22 @@ impl <Iter: Iterator<Item=char>> Parser<Iter> {
 				name: module_name,
 				templ_args: tdecl,
 				attrs: attrs.clone(),
-				clock: None,
-				enable: None,
-				reset: None,
 				content: Box::new(content),
 				ports: io,
 				src: SrcInfo::default(),
 			}), attrs)))
 		} else if self.state.consume_sym(ids, ";")? {
 			Ok(Some(Statement::new(Null, attrs)))
+		} else if self.is_interface && self.state.consume_kw(ids, constids::input)? {
+			let typ = self.parse_datatype(ids, curr_scope)?.unwrap();
+			let name = self.state.expect_ident(ids)?;
+			self.state.consume_sym(ids, ";")?;
+			Ok(Some(Statement::new(InterfacePort(ModuleIO {name: name, arg_type: typ, dir: IODir::Input}), attrs)))
+		} else if self.is_interface && self.state.consume_kw(ids, constids::output)? {
+			let typ = self.parse_datatype(ids, curr_scope)?.unwrap();
+			let name = self.state.expect_ident(ids)?;
+			self.state.consume_sym(ids, ";")?;
+			Ok(Some(Statement::new(InterfacePort(ModuleIO {name: name, arg_type: typ, dir: IODir::Output}), attrs)))
 		} else {
 			// Attempt to parse as a data type (variable or function)
 			self.state.enter_ambig();

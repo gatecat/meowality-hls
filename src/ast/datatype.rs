@@ -158,6 +158,7 @@ impl fmt::Display for TemplateArg {
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct StructureDef {
 	pub name: IdString,
+	pub is_interface: bool,
 	pub templ_args: Vec<TemplateArg>,
 	pub block: Box<Statement>,
 	pub attrs: AttributeList,

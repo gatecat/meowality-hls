@@ -68,7 +68,6 @@ pub struct Function {
 pub enum IODir {
 	Input,
 	Output,
-	Interface,
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -79,28 +78,10 @@ pub struct ModuleIO {
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]
-pub struct ClockInfo {
-	pub freq: u64,
-	pub is_falling_edge: bool,
-}
-
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub struct EnableInfo {}
-
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub struct ResetInfo {
-	pub is_sync: bool,
-	pub is_active_low: bool,
-}
-
-#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Module {
 	pub name: IdString,
 	pub templ_args: Vec<TemplateArg>,
 	pub ports: Vec<ModuleIO>,
-	pub clock: Option<ClockInfo>,
-	pub enable: Option<EnableInfo>,
-	pub reset: Option<ResetInfo>,
 	pub attrs: AttributeList,
 	pub src: SrcInfo,
 	pub content: Box<Statement>,
@@ -123,6 +104,7 @@ pub enum StatementType {
 	Func(Function),
 	Struct(StructureDef),
 	Expr(Expression),
+	InterfacePort(ModuleIO),
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -254,9 +236,6 @@ impl Statement {
 			Module(m) => {
 				Self::write_targs(stream, &m.templ_args)?;
 				write!(stream, "module {:?}(", m.name)?;
-				if let Some(_) = &m.clock { write!(stream, "clock, ")?; }
-				if let Some(_) = &m.enable { write!(stream, "enable, ")?; }
-				if let Some(_) = &m.reset { write!(stream, "reset, ")?; }
 				for p in m.ports.iter().filter(|p| p.dir == IODir::Input) {
 					write!(stream, "{} {:?},", p.arg_type, p.name)?;
 				}
@@ -280,10 +259,22 @@ impl Statement {
 			},
 			Struct(s) => {
 				Self::write_targs(stream, &s.templ_args)?;
-				write!(stream, "struct {:?}", s.name)?;
+				if s.is_interface {
+					write!(stream, "inteface ")?
+				} else {
+					write!(stream, "struct ")?;
+				}
+				write!(stream, "{:?}", s.name)?;
 				s.block.dump(stream, indent + 2, true)?;
 			},
 			Expr(e) => write!(stream, "{}", e)?,
+			InterfacePort(p) => {
+				match &p.dir {
+					IODir::Input => write!(stream, "input ")?,
+					IODir::Output => write!(stream, "output ")?,
+				};
+				write!(stream, "{} {:?};", p.arg_type, p.name)?;
+			}
 			_ => unimplemented!(),
 		}
 		if newline { writeln!(stream, "")?; }
