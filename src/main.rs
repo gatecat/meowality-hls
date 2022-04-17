@@ -7,6 +7,7 @@ pub mod core;
 pub mod design;
 pub mod parser;
 pub mod codegen;
+pub mod backend;
 
 use std::io::Read;
 use std::fs::File;
