@@ -19,7 +19,6 @@ pub enum LowPrim {
 	BitSelect {src: IdString, start: usize, end: usize},
 	Cat {src: Vec<IdString>},
 	Mux {src: Vec<IdString>, sel: IdString},
-	
 }
 
 pub struct LowNode {
@@ -32,5 +31,5 @@ pub struct LowNode {
 
 pub struct LowNetlist {
 	pub name: IdString,
-	pub node: FxHashMap<IdString, LowNode>,
+	pub nodes: FxHashMap<IdString, LowNode>,
 }
